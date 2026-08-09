@@ -1,0 +1,6 @@
+{
+  "name": "PDF Table Extractor & Excel Exporter",
+  "description": "Procesador de PDFs escaneados con Google Gemini AI para extraer tablas y exportar reportes consolidados a Excel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

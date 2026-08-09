@@ -1,0 +1,2145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Procesador de PDFs Escaneados - Extraer Tablas a Excel con Gemini AI</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            display: ['"Space Grotesk"', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+              900: '#14532d',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- SheetJS (XLSX) CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <!-- PDF.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    if (typeof pdfjsLib !== 'undefined') {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+  </script>
+
+  <style>
+    /* Custom Scrollbars and Transitions */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    .drop-active {
+      border-color: #16a34a !important;
+      background-color: #f0fdf4 !important;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col antialiased selection:bg-brand-100 selection:text-brand-900">
+
+  <!-- Top Accent Bar -->
+  <div class="h-1.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-600 w-full"></div>
+
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-sm font-bold text-xl">
+          <img src="./assets/logoEPE.png">
+        </div>
+        <div>
+          <h1 class="font-display font-bold text-xl text-slate-900 leading-tight">
+            Cálculo de materiales para Obras <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 ml-1">Gemini AI Flash</span>
+          </h1>
+          <p class="text-xs text-slate-500">Procesamiento y exportación de Normas TN de EPE </p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 text-xs">
+        <div id="serverKeyBadge" class="hidden items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          Key Servidor Detectada
+        </div>
+        <div id="localKeyBadge" class="hidden items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-medium">
+          <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+          Key Guardada en Navegador
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
+
+    <!-- SECTION 1: Configuración & Carga de Archivos -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      
+      <!-- Card: API Key Configuration -->
+      <div class="lg:col-span-5 bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+              <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 0121 9z"></path></svg>
+              1. Configuración API Key
+            </h2>
+            <span class="text-xs text-slate-400">Google Gemini</span>
+          </div>
+          <p class="text-xs text-slate-600 mb-4 leading-relaxed">
+            Ingresa tu <code class="bg-slate-100 px-1 py-0.5 rounded text-slate-800 font-mono">GEMINI_API_KEY</code> para procesar las tablas de tus PDFs con el modelo de visión.
+          </p>
+
+          <div class="space-y-3">
+            <label class="block text-xs font-semibold text-slate-700">Clave de API Gemini:</label>
+            <div class="relative">
+              <input type="password" id="apiKeyInput" placeholder="AIzaSy..."
+                class="w-full pl-3 pr-10 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-mono" />
+              <button type="button" id="toggleKeyBtn" title="Mostrar/Ocultar"
+                class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1">
+                👁️
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between gap-2">
+          <span id="keyStatusText" class="text-xs text-slate-500">Estado: <span class="font-medium text-amber-600">No configurada</span></span>
+          <button type="button" id="saveKeyBtn"
+            class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl transition-all shadow-xs flex items-center gap-1.5">
+            💾 Guardar Key
+          </button>
+        </div>
+      </div>
+
+      <!-- Card: Drag and Drop PDF Upload -->
+      <div class="lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+              <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+              2. Carga de Archivos PDF
+            </h2>
+            <span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">Sólo .PDF</span>
+          </div>
+
+          <!-- Dropzone -->
+          <div id="dropZone"
+            class="border-2 border-dashed border-slate-300 hover:border-emerald-500 bg-slate-50 hover:bg-emerald-50/50 rounded-2xl p-6 text-center cursor-pointer transition-all duration-200 group">
+            <input type="file" id="pdfFileInput" accept=".pdf" multiple class="hidden" />
+            
+            <div class="w-12 h-12 rounded-full bg-emerald-100 group-hover:bg-emerald-200 text-emerald-700 flex items-center justify-center mx-auto mb-3 transition-colors">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            </div>
+            
+            <p class="text-sm font-semibold text-slate-800">
+              Arrastra tus archivos PDF aquí o <span class="text-emerald-600 underline group-hover:text-emerald-700">haz clic para examinar</span>
+            </p>
+            <p class="text-xs text-slate-500 mt-1">
+              Soporta documentos PDFs escaneados obtenidos de la web de información técnica de EPE
+            </p>
+          </div>
+        </div>
+
+        <div class="mt-3 flex items-center justify-between text-xs text-slate-500">
+          <span>Selección múltiple habilitada</span>
+          <span id="selectedCountText" class="font-medium text-slate-700">0 archivos subidos</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 2: Gestión de Archivos Cargados & Control -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+      <div class="p-4 sm:p-5 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            📂 Archivos PDF Cargados
+            <span id="fileBadgeCount" class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-700">0</span>
+          </h2>
+          <p class="text-xs text-slate-500 mt-0.5">Revisa la lista de PDFs pendientes por analizar</p>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button type="button" id="openTnModalBtn"
+            class="hidden px-3.5 py-2 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer">
+            📦 Archivos TN (<span id="tnBadgeCount">0</span>)
+          </button>
+
+          <button type="button" id="clearListBtn"
+            class="px-3 py-2 text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 rounded-xl text-xs font-medium transition-colors flex items-center gap-1.5">
+            🗑️ Vaciar Lista
+          </button>
+          
+          <button type="button" id="processPdfsBtn" disabled
+            class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white disabled:text-slate-500 text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Procesar PDFs Cargados
+          </button>
+        </div>
+      </div>
+
+      <!-- File Table / Empty State -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr class="bg-slate-100/70 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider">
+              <th class="py-3 px-4">Nombre del Archivo</th>
+              <th class="py-3 px-4 w-28">Tamaño</th>
+              <th class="py-3 px-4 w-28 text-center">Páginas</th>
+              <th class="py-3 px-4 w-36 text-center">Estado</th>
+              <th class="py-3 px-4 w-24 text-right">Acción</th>
+            </tr>
+          </thead>
+          <tbody id="fileTableBody" class="divide-y divide-slate-100">
+            <!-- Empty state default row -->
+            <tr id="emptyFileRow">
+              <td colspan="5" class="py-8 text-center text-slate-400">
+                <div class="max-w-xs mx-auto">
+                  <p class="text-sm font-medium text-slate-500">No hay archivos PDF en la lista</p>
+                  <p class="text-xs mt-1">Arrastra o selecciona tus archivos en la zona de carga para comenzar.</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Global Progress Bar & Step Log -->
+      <div id="progressContainer" class="hidden p-4 border-t border-slate-200 bg-slate-50">
+        <div class="flex items-center justify-between text-xs mb-1.5">
+          <span id="progressStatusText" class="font-medium text-slate-700">Iniciando procesamiento...</span>
+          <span id="progressPercentText" class="font-bold text-emerald-700">0%</span>
+        </div>
+        <div class="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
+          <div id="progressBarFill" class="h-full bg-emerald-500 transition-all duration-300 w-0"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 3: Previsualización, Resultados & Exportación Excel -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+      
+      <!-- Top Section Bar with Metrics and Export -->
+      <div class="p-4 sm:p-5 border-b border-slate-200 bg-slate-50/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            📊 Resultados Extraídos y Consolidados
+          </h2>
+          <p class="text-xs text-slate-500 mt-0.5">Visión unificada de tablas analizadas con Gemini AI</p>
+        </div>
+
+        <!-- Metrics Chips -->
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-2xs text-center">
+            <div class="text-xs text-slate-400 uppercase font-medium">Ítems Únicos</div>
+            <div id="metricConsolidatedCount" class="text-sm font-bold text-slate-800">0</div>
+          </div>
+          <div class="bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-2xs text-center">
+            <div class="text-xs text-slate-400 uppercase font-medium">Suma Cantidad (CANT.)</div>
+            <div id="metricTotalCant" class="text-sm font-bold text-emerald-600">0</div>
+          </div>
+          
+          <!-- Export Button -->
+          <button type="button" id="exportExcelBtn" disabled
+            class="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-300 text-white disabled:text-slate-500 text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed">
+            <svg class="w-4 h-4 text-emerald-200" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6zm10-10l-2.5 3.5L16 17h-2.1l-1.4-2.2L11.1 17H9l2.5-3.5L9 10h2.1l1.4 2.2L13.9 10H16z"/></svg>
+            Exportar a Excel (.xlsx)
+          </button>
+        </div>
+      </div>
+
+      <!-- Tabs Header -->
+      <div class="px-4 border-b border-slate-200 bg-white flex items-center justify-between gap-4 overflow-x-auto">
+        <div class="flex items-center gap-1">
+          <button type="button" data-tab="consolidated" class="tab-btn py-3 px-4 text-xs font-bold border-b-2 border-emerald-600 text-emerald-700 flex items-center gap-1.5">
+            📋 Tabla Consolidada (Agrupada)
+            <span id="consolidatedBadge" class="bg-emerald-100 text-emerald-800 text-2xs px-1.5 py-0.5 rounded-full font-bold">0</span>
+          </button>
+          <button type="button" data-tab="raw" class="tab-btn py-3 px-4 text-xs font-medium text-slate-500 hover:text-slate-800 border-b-2 border-transparent flex items-center gap-1.5">
+            🔍 Renglones Individuales (Raw)
+            <span id="rawBadge" class="bg-slate-100 text-slate-600 text-2xs px-1.5 py-0.5 rounded-full font-bold">0</span>
+          </button>
+          <button type="button" data-tab="preview" class="tab-btn py-3 px-4 text-xs font-medium text-slate-500 hover:text-slate-800 border-b-2 border-transparent flex items-center gap-1.5">
+            🖼️ Vista Previa Páginas PDF
+          </button>
+        </div>
+
+        <!-- Filter / Search input -->
+        <div class="py-2 flex items-center gap-2">
+          <input type="text" id="tableSearchInput" placeholder="Buscar por código, matrícula o descripción..."
+            class="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg w-64 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white" />
+        </div>
+      </div>
+
+      <!-- Tab Content 1: Consolidated Table -->
+      <div id="tabContentConsolidated" class="tab-content block p-0">
+        <!-- Legend & Summary Bar -->
+        <div class="px-4 py-2.5 bg-slate-100/80 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div class="flex items-center gap-4">
+            <span class="flex items-center gap-1.5 font-semibold text-slate-700">
+              <span class="w-3.5 h-3.5 rounded bg-amber-200 border border-amber-400 shadow-2xs"></span>
+              Elemento Repetido (Fondo destacado Ámbar)
+            </span>
+            <span class="flex items-center gap-1.5 font-medium text-slate-600">
+              <span class="w-3.5 h-3.5 rounded bg-white border border-slate-300 shadow-2xs"></span>
+              Elemento Único
+            </span>
+          </div>
+          <div id="repeatedMetricBadge" class="text-xs font-bold text-amber-800 bg-amber-100/80 border border-amber-300 px-3 py-1 rounded-full shadow-2xs">
+            0 elementos repetidos
+          </div>
+        </div>
+
+        <div class="overflow-x-auto max-h-[500px]">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="sticky top-0 bg-slate-100 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider z-10 shadow-2xs">
+              <tr>
+                <th class="py-3 px-4 w-36">CÓDIGO</th>
+                <th class="py-3 px-4 w-32">MATRIC.</th>
+                <th class="py-3 px-4">DESCRIPCIÓN</th>
+                <th class="py-3 px-4 w-24 text-center">UNIDAD</th>
+                <th class="py-3 px-4 w-28 text-right bg-emerald-50/60 text-emerald-900 font-extrabold">CANT.</th>
+                <th class="py-3 px-4 w-64 text-slate-700 font-bold">ORIGEN (Archivos PDFs)</th>
+              </tr>
+            </thead>
+            <tbody id="consolidatedTableBody" class="divide-y divide-slate-100">
+              <tr>
+                <td colspan="6" class="py-12 text-center text-slate-400">
+                  <p class="text-sm font-medium text-slate-500">Aún no se han procesado tablas</p>
+                  <p class="text-xs mt-1 text-slate-400">Presiona "Procesar PDFs Cargados" para realizar la extracción con Gemini AI.</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab Content 2: Raw Extracted Rows -->
+      <div id="tabContentRaw" class="tab-content hidden p-0">
+        <div class="overflow-x-auto max-h-[500px]">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="sticky top-0 bg-slate-100 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider z-10">
+              <tr>
+                <th class="py-3 px-4 w-12 text-center">#</th>
+                <th class="py-3 px-4 w-28">CÓDIGO</th>
+                <th class="py-3 px-4 w-28">MATRIC.</th>
+                <th class="py-3 px-4">DESCRIPCIÓN</th>
+                <th class="py-3 px-4 w-20 text-center">UNIDAD</th>
+                <th class="py-3 px-4 w-24 text-right">CANT.</th>
+                <th class="py-3 px-4 w-44">Archivo / Pág</th>
+              </tr>
+            </thead>
+            <tbody id="rawTableBody" class="divide-y divide-slate-100">
+              <tr>
+                <td colspan="7" class="py-12 text-center text-slate-400">Sin datos individuales extraídos.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab Content 3: Page Previews -->
+      <div id="tabContentPreview" class="tab-content hidden p-5 bg-slate-100/50">
+        <div id="previewGallery" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          <p class="text-xs text-slate-400 col-span-full text-center py-8">
+            Las previsualizaciones de las páginas procesadas aparecerán aquí una vez ejecutado el análisis.
+          </p>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="mt-auto border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <p>© Procesador de Tablas PDF con Google Gemini AI & Exportador Excel (SheetJS)</p>
+      <p class="text-2xs text-slate-400">Creado por <a style="color: rgb(24, 47, 255);" href="mailto:mzapata@epe.santafe.gov.ar">maxinz</a> con Google AI Studio</p>
+    </div>
+  </footer>
+
+  <!-- Application Script -->
+  <script>
+    // State Store
+    const state = {
+      apiKey: '',
+      hasServerKey: false,
+      files: [], // { id, name, size, file, status, numPages, rawItems: [], pageCanvases: [] }
+      allRawItems: [],
+      consolidatedItems: [],
+      activeTab: 'consolidated',
+      isProcessing: false,
+      resolvedTnKeys: new Set()
+    };
+
+    let pendingTnCodes = []; // Array of { code: 'TN 80', key: 'TN80', multiplier: 6, files: [] }
+
+    // DOM Elements
+    const apiKeyInput = document.getElementById('apiKeyInput');
+    const toggleKeyBtn = document.getElementById('toggleKeyBtn');
+    const saveKeyBtn = document.getElementById('saveKeyBtn');
+    const keyStatusText = document.getElementById('keyStatusText');
+    const serverKeyBadge = document.getElementById('serverKeyBadge');
+    const localKeyBadge = document.getElementById('localKeyBadge');
+
+    const dropZone = document.getElementById('dropZone');
+    const pdfFileInput = document.getElementById('pdfFileInput');
+    const selectedCountText = document.getElementById('selectedCountText');
+    
+    const fileTableBody = document.getElementById('fileTableBody');
+    const emptyFileRow = document.getElementById('emptyFileRow');
+    const fileBadgeCount = document.getElementById('fileBadgeCount');
+    const clearListBtn = document.getElementById('clearListBtn');
+    const processPdfsBtn = document.getElementById('processPdfsBtn');
+
+    const progressContainer = document.getElementById('progressContainer');
+    const progressStatusText = document.getElementById('progressStatusText');
+    const progressPercentText = document.getElementById('progressPercentText');
+    const progressBarFill = document.getElementById('progressBarFill');
+
+    const metricConsolidatedCount = document.getElementById('metricConsolidatedCount');
+    const metricTotalCant = document.getElementById('metricTotalCant');
+    const exportExcelBtn = document.getElementById('exportExcelBtn');
+
+    const consolidatedTableBody = document.getElementById('consolidatedTableBody');
+    const rawTableBody = document.getElementById('rawTableBody');
+    const previewGallery = document.getElementById('previewGallery');
+    const tableSearchInput = document.getElementById('tableSearchInput');
+    
+    const consolidatedBadge = document.getElementById('consolidatedBadge');
+    const rawBadge = document.getElementById('rawBadge');
+
+    // Initialize App
+    async function init() {
+      // Check server API key configuration
+      try {
+        const res = await fetch('/api/config');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.hasServerKey) {
+            state.hasServerKey = true;
+            serverKeyBadge.classList.remove('hidden');
+            serverKeyBadge.classList.add('flex');
+            keyStatusText.innerHTML = 'Estado: <span class="font-bold text-emerald-600">Servidor (Configurada)</span>';
+          }
+        }
+      } catch (e) {
+        console.log('Modo cliente standalone / sin servidor Express.');
+      }
+
+      // Load saved API key from localStorage
+      const savedKey = localStorage.getItem('gemini_api_key');
+      if (savedKey) {
+        state.apiKey = savedKey;
+        apiKeyInput.value = savedKey;
+        if (!state.hasServerKey) {
+          localKeyBadge.classList.remove('hidden');
+          localKeyBadge.classList.add('flex');
+          keyStatusText.innerHTML = 'Estado: <span class="font-bold text-indigo-600">Guardada en Navegador</span>';
+        }
+      }
+
+      setupEventListeners();
+      updateProcessButtonState();
+    }
+
+    function setupEventListeners() {
+      // Key toggle show/hide
+      toggleKeyBtn.addEventListener('click', () => {
+        apiKeyInput.type = apiKeyInput.type === 'password' ? 'text' : 'password';
+      });
+
+      // Save Key button
+      saveKeyBtn.addEventListener('click', () => {
+        const val = apiKeyInput.value.trim();
+        state.apiKey = val;
+        localStorage.setItem('gemini_api_key', val);
+        alert(val ? 'API Key guardada con éxito en el navegador.' : 'API Key removida.');
+        if (val) {
+          localKeyBadge.classList.remove('hidden');
+          localKeyBadge.classList.add('flex');
+          keyStatusText.innerHTML = 'Estado: <span class="font-bold text-indigo-600">Guardada en Navegador</span>';
+        } else {
+          localKeyBadge.classList.add('hidden');
+          keyStatusText.innerHTML = 'Estado: <span class="font-medium text-amber-600">No configurada</span>';
+        }
+        updateProcessButtonState();
+      });
+
+      // Quota modal event listeners
+      const closeQuotaModalBtn = document.getElementById('closeQuotaModalBtn');
+      const acceptQuotaModalBtn = document.getElementById('acceptQuotaModalBtn');
+      const quotaModal = document.getElementById('quotaModal');
+
+      if (closeQuotaModalBtn) closeQuotaModalBtn.addEventListener('click', hideQuotaModal);
+      if (acceptQuotaModalBtn) acceptQuotaModalBtn.addEventListener('click', hideQuotaModal);
+      if (quotaModal) {
+        quotaModal.addEventListener('click', (e) => {
+          if (e.target === quotaModal) hideQuotaModal();
+        });
+      }
+
+      // Open TN Modal button
+      const openTnModalBtn = document.getElementById('openTnModalBtn');
+      if (openTnModalBtn) {
+        openTnModalBtn.addEventListener('click', () => {
+          updateTnStatus();
+          showTnModal();
+        });
+      }
+
+      // TN modal event listeners
+      const closeTnModalBtn = document.getElementById('closeTnModalBtn');
+      const skipTnModalBtn = document.getElementById('skipTnModalBtn');
+      const processTnFilesBtn = document.getElementById('processTnFilesBtn');
+      const tnModal = document.getElementById('tnModal');
+
+      if (closeTnModalBtn) {
+        closeTnModalBtn.addEventListener('click', () => {
+          hideTnModal();
+          if (state.isProcessing) finishAllProcessing();
+        });
+      }
+
+      if (skipTnModalBtn) {
+        skipTnModalBtn.addEventListener('click', () => {
+          if (pendingTnCodes) pendingTnCodes.forEach(p => state.resolvedTnKeys.add(p.key));
+          hideTnModal();
+          updateTnStatus();
+          if (state.isProcessing) finishAllProcessing();
+        });
+      }
+
+      if (processTnFilesBtn) {
+        processTnFilesBtn.addEventListener('click', processTnFiles);
+      }
+
+      if (tnModal) {
+        tnModal.addEventListener('click', (e) => {
+          if (e.target === tnModal) {
+            hideTnModal();
+            if (state.isProcessing) finishAllProcessing();
+          }
+        });
+      }
+
+      // General Dropzone inside TN modal
+      const tnGeneralDropzone = document.getElementById('tnGeneralDropzone');
+      const tnGeneralFileInput = document.getElementById('tnGeneralFileInput');
+
+      if (tnGeneralDropzone && tnGeneralFileInput) {
+        tnGeneralDropzone.addEventListener('click', () => tnGeneralFileInput.click());
+
+        tnGeneralFileInput.addEventListener('change', (e) => {
+          handleGeneralTnFiles(e.target.files);
+        });
+
+        ['dragenter', 'dragover'].forEach(evt => {
+          tnGeneralDropzone.addEventListener(evt, (e) => {
+            e.preventDefault();
+            tnGeneralDropzone.classList.add('bg-amber-200/60');
+          });
+        });
+
+        ['dragleave', 'drop'].forEach(evt => {
+          tnGeneralDropzone.addEventListener(evt, (e) => {
+            e.preventDefault();
+            tnGeneralDropzone.classList.remove('bg-amber-200/60');
+          });
+        });
+
+        tnGeneralDropzone.addEventListener('drop', (e) => {
+          e.preventDefault();
+          handleGeneralTnFiles(e.dataTransfer.files);
+        });
+      }
+
+      // Dropzone click & drag drop
+      dropZone.addEventListener('click', () => pdfFileInput.click());
+
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          dropZone.classList.add('drop-active');
+        }, false);
+      });
+
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          dropZone.classList.remove('drop-active');
+        }, false);
+      });
+
+      dropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        handleFilesSelected(files);
+      });
+
+      pdfFileInput.addEventListener('change', (e) => {
+        handleFilesSelected(e.target.files);
+      });
+
+      // Clear list button
+      clearListBtn.addEventListener('click', () => {
+        state.files = [];
+        state.allRawItems = [];
+        state.consolidatedItems = [];
+        state.resolvedTnKeys = new Set();
+        pendingTnCodes = [];
+
+        // Reset input elements
+        if (pdfFileInput) pdfFileInput.value = '';
+        if (tableSearchInput) tableSearchInput.value = '';
+
+        // Reset metrics and badges in "Resultados Extraídos y Consolidados"
+        if (metricConsolidatedCount) metricConsolidatedCount.textContent = '0';
+        if (metricTotalCant) metricTotalCant.textContent = '0';
+        if (consolidatedBadge) consolidatedBadge.textContent = '0';
+        if (rawBadge) rawBadge.textContent = '0';
+
+        const repeatedMetricBadge = document.getElementById('repeatedMetricBadge');
+        if (repeatedMetricBadge) repeatedMetricBadge.textContent = '0 elementos repetidos';
+
+        // Reset export button state
+        if (exportExcelBtn) exportExcelBtn.disabled = true;
+
+        // Reset page previews gallery
+        if (previewGallery) {
+          previewGallery.innerHTML = `
+            <p class="text-xs text-slate-400 col-span-full text-center py-8">
+              Las previsualizaciones de las páginas procesadas aparecerán aquí una vez ejecutado el análisis.
+            </p>
+          `;
+        }
+
+        // Render file list and tables
+        updateTnStatus();
+        renderFileList();
+        renderConsolidatedTable();
+        renderRawTable();
+        updateProcessButtonState();
+      });
+
+      // Process button
+      processPdfsBtn.addEventListener('click', processAllPdfs);
+
+      // Export button
+      exportExcelBtn.addEventListener('click', exportToExcel);
+
+      // Tabs switching
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const targetTab = btn.getAttribute('data-tab');
+          switchTab(targetTab);
+        });
+      });
+
+      // Live Table Filter
+      tableSearchInput.addEventListener('input', () => {
+        renderConsolidatedTable();
+        renderRawTable();
+      });
+    }
+
+    // Handle selected PDF files
+    function handleFilesSelected(fileList) {
+      const addedFiles = Array.from(fileList).filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+
+      if (addedFiles.length === 0) {
+        alert('Por favor selecciona únicamente archivos en formato PDF (.pdf).');
+        return;
+      }
+
+      addedFiles.forEach(file => {
+        const exists = state.files.some(existing => existing.name === file.name && existing.size === file.size);
+        if (!exists) {
+          state.files.push({
+            id: 'file_' + Math.random().toString(36).substr(2, 9),
+            name: file.name,
+            size: file.size,
+            file: file,
+            status: 'Pendiente', // Pendiente, Procesando, Completado, Error
+            numPages: '...',
+            rawItems: [],
+            pagePreviews: []
+          });
+        }
+      });
+
+      renderFileList();
+      updateProcessButtonState();
+    }
+
+    // Format Bytes
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // Render File List Table
+    function renderFileList() {
+      fileBadgeCount.textContent = state.files.length;
+      selectedCountText.textContent = `${state.files.length} archivo(s) listo(s)`;
+
+      if (state.files.length === 0) {
+        emptyFileRow.style.display = '';
+        fileTableBody.innerHTML = '';
+        fileTableBody.appendChild(emptyFileRow);
+        return;
+      }
+
+      fileTableBody.innerHTML = '';
+      state.files.forEach((fileObj, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition-colors';
+
+        let statusBadge = '';
+        if (fileObj.status === 'Pendiente') {
+          statusBadge = `<span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-2xs font-semibold">Pendiente</span>`;
+        } else if (fileObj.status === 'Procesando') {
+          statusBadge = `<span class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-2xs font-semibold animate-pulse flex items-center justify-center gap-1">⏳ Procesando...</span>`;
+        } else if (fileObj.status === 'Completado') {
+          statusBadge = `<span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-2xs font-semibold">✓ Completado</span>`;
+        } else if (fileObj.status === 'Cuota Excedida') {
+          statusBadge = `<span class="px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 border border-orange-300 text-2xs font-semibold">⚠️ Cuota Excedida</span>`;
+        } else {
+          statusBadge = `<span class="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-2xs font-semibold">❌ Error</span>`;
+        }
+
+        const tagHtml = fileObj.isSubTn
+          ? `<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 font-mono font-extrabold text-[10px] shrink-0">TN: ${fileObj.tnCode} (x${fileObj.multiplier})</span>`
+          : '';
+
+        let retryBtn = '';
+        if (!state.isProcessing && (fileObj.status === 'Error' || fileObj.status === 'Cuota Excedida')) {
+          retryBtn = `
+            <button type="button" onclick="retrySingleFile('${fileObj.id}')"
+              class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1 shadow-2xs cursor-pointer" title="Reintentar este archivo">
+              🔄 Reintentar
+            </button>
+          `;
+        }
+
+        tr.innerHTML = `
+          <td class="py-3 px-4 font-semibold text-slate-800 flex items-center gap-2">
+            <span class="text-rose-600">📄</span>
+            <span class="truncate max-w-xs" title="${fileObj.name}">${fileObj.name}</span>
+            ${tagHtml}
+          </td>
+          <td class="py-3 px-4 text-slate-500 font-mono text-2xs">${formatBytes(fileObj.size)}</td>
+          <td class="py-3 px-4 text-center font-semibold text-slate-700">${fileObj.numPages}</td>
+          <td class="py-3 px-4 text-center">${statusBadge}</td>
+          <td class="py-3 px-4 text-right">
+            <div class="flex items-center justify-end gap-1.5">
+              ${retryBtn}
+              <button type="button" onclick="removeFile('${fileObj.id}')" ${state.isProcessing ? 'disabled' : ''}
+                class="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1.5 rounded-lg transition-colors text-xs font-medium cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed" title="Eliminar archivo">
+                Eliminar
+              </button>
+            </div>
+          </td>
+        `;
+        fileTableBody.appendChild(tr);
+      });
+    }
+
+    // Remove File
+    window.removeFile = function(fileId) {
+      if (state.isProcessing) return;
+      state.files = state.files.filter(f => f.id !== fileId);
+
+      // Re-flatten state.allRawItems from remaining files
+      state.allRawItems = [];
+      state.files.forEach(f => {
+        if (f.rawItems && f.rawItems.length > 0) {
+          state.allRawItems.push(...f.rawItems);
+        }
+      });
+
+      // Re-consolidate remaining data
+      consolidateData();
+
+      // Update TN status (re-calculates multipliers, modal cards, and openTnModalBtn visibility)
+      updateTnStatus();
+
+      // Re-render UI
+      renderFileList();
+      renderConsolidatedTable();
+      renderRawTable();
+      updateProcessButtonState();
+
+      if (exportExcelBtn) {
+        exportExcelBtn.disabled = state.consolidatedItems.length === 0;
+      }
+    };
+
+    // Update Process Button State
+    function updateProcessButtonState() {
+      const hasKey = state.hasServerKey || (state.apiKey && state.apiKey.length > 5) || apiKeyInput.value.trim().length > 5;
+      const hasFiles = state.files.length > 0;
+      const hasUnprocessed = state.files.some(f => f.status !== 'Completado');
+      processPdfsBtn.disabled = !hasKey || !hasFiles || state.isProcessing || !hasUnprocessed;
+
+      const hasCompleted = state.files.some(f => f.status === 'Completado');
+      const hasFailedOrPending = state.files.some(f => f.status === 'Cuota Excedida' || f.status === 'Error' || f.status === 'Pendiente');
+
+      if (hasCompleted && hasFailedOrPending) {
+        processPdfsBtn.innerHTML = `
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+          Reintentar / Continuar Procesamiento
+        `;
+      } else if (state.files.some(f => f.status === 'Cuota Excedida' || f.status === 'Error')) {
+        processPdfsBtn.innerHTML = `
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+          Reintentar Procesamiento
+        `;
+      } else {
+        processPdfsBtn.innerHTML = `
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          Procesar PDFs Cargados
+        `;
+      }
+    }
+
+    // Switch Tabs
+    function switchTab(tabName) {
+      state.activeTab = tabName;
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        if (btn.getAttribute('data-tab') === tabName) {
+          btn.className = 'tab-btn py-3 px-4 text-xs font-bold border-b-2 border-emerald-600 text-emerald-700 flex items-center gap-1.5';
+        } else {
+          btn.className = 'tab-btn py-3 px-4 text-xs font-medium text-slate-500 hover:text-slate-800 border-b-2 border-transparent flex items-center gap-1.5';
+        }
+      });
+
+      document.getElementById('tabContentConsolidated').style.display = tabName === 'consolidated' ? 'block' : 'none';
+      document.getElementById('tabContentRaw').style.display = tabName === 'raw' ? 'block' : 'none';
+      document.getElementById('tabContentPreview').style.display = tabName === 'preview' ? 'block' : 'none';
+    }
+
+    function rebuildAllRawItems() {
+      state.allRawItems = [];
+      state.files.forEach(f => {
+        if (f.status === 'Completado' && Array.isArray(f.rawItems)) {
+          state.allRawItems.push(...f.rawItems);
+        }
+      });
+    }
+
+    // PROCESS ALL PDF FILES WITH GEMINI
+    async function processAllPdfs() {
+      if (state.files.length === 0) return;
+
+      const currentKey = apiKeyInput.value.trim() || state.apiKey;
+      if (!state.hasServerKey && (!currentKey || currentKey.length < 5)) {
+        alert('Por favor ingresa una API Key válida de Google Gemini antes de continuar.');
+        return;
+      }
+
+      state.isProcessing = true;
+      processPdfsBtn.disabled = true;
+      progressContainer.classList.remove('hidden');
+
+      // Rebuild raw items from already completed files so prior data is preserved
+      rebuildAllRawItems();
+
+      let totalFiles = state.files.length;
+      let completedFiles = state.files.filter(f => f.status === 'Completado').length;
+
+      updateProgress(
+        Math.round((completedFiles / totalFiles) * 100),
+        completedFiles > 0
+          ? `Reanudando análisis (${completedFiles}/${totalFiles} ya completados)...`
+          : `Iniciando procesamiento de ${totalFiles} archivo(s)...`
+      );
+
+      for (let i = 0; i < state.files.length; i++) {
+        const fileObj = state.files[i];
+
+        // Skip files that have already been processed successfully
+        if (fileObj.status === 'Completado') {
+          continue;
+        }
+
+        fileObj.status = 'Procesando';
+        renderFileList();
+
+        const currentPercent = Math.round((completedFiles / totalFiles) * 100);
+
+        updateProgress(
+          currentPercent,
+          `Procesando archivo ${i + 1} de ${totalFiles}: ${fileObj.name}`
+        );
+
+        try {
+          const arrayBuffer = await fileObj.file.arrayBuffer();
+          const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+          fileObj.numPages = pdfDoc.numPages;
+          renderFileList();
+
+          fileObj.rawItems = [];
+
+          for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+            updateProgress(
+              currentPercent,
+              `Analizando pág. ${pageNum}/${pdfDoc.numPages} de ${fileObj.name} con Gemini AI...`
+            );
+
+            // Render PDF page to canvas
+            const page = await pdfDoc.getPage(pageNum);
+            const viewport = page.getViewport({ scale: 2.0 }); // 2x scale for high quality text OCR
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            // Ensure opaque white background fill to prevent dark/transparent PDF export glitches
+            context.fillStyle = '#FFFFFF';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+
+            await page.render({
+              canvasContext: context,
+              viewport: viewport
+            }).promise;
+
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            const base64Image = dataUrl.split(',')[1];
+
+            // Add thumbnail to preview gallery
+            addPreviewCard(fileObj.name, pageNum, dataUrl);
+
+            // Send to Gemini API (via server endpoint or direct REST fallback)
+            const extractedItems = await callGeminiVisionAPI(base64Image, currentKey);
+
+            // Append metadata source
+            extractedItems.forEach(item => {
+              let itemWithMeta;
+              if (fileObj.isSubTn) {
+                const rawCant = normalizeCant(item.cant);
+                const multipliedCant = rawCant * (fileObj.multiplier || 1);
+                const sourceTag = `${fileObj.name} [Despiece ${fileObj.tnCode} x${fileObj.multiplier}]`;
+                itemWithMeta = {
+                  ...item,
+                  cant: multipliedCant,
+                  sourceFile: sourceTag,
+                  sourcePage: pageNum
+                };
+              } else {
+                itemWithMeta = {
+                  ...item,
+                  sourceFile: fileObj.name,
+                  sourcePage: pageNum
+                };
+              }
+              fileObj.rawItems.push(itemWithMeta);
+              state.allRawItems.push(itemWithMeta);
+            });
+
+            // Small delay between pages to respect rate limits
+            if (pageNum < pdfDoc.numPages) {
+              await new Promise(r => setTimeout(r, 1500));
+            }
+          }
+
+          fileObj.status = 'Completado';
+          completedFiles++;
+          const newPercent = Math.round((completedFiles / totalFiles) * 100);
+          updateProgress(
+            newPercent,
+            `Archivo ${completedFiles} de ${totalFiles} procesado: ${fileObj.name}`
+          );
+        } catch (err) {
+          console.error('Error procesando PDF:', err);
+          const errText = String(err.message || err || '');
+          if (errText.includes('Todos los modelos de GEMINI') || errText.includes('429') || errText.includes('Quota exceeded') || errText.includes('RESOURCE_EXHAUSTED')) {
+            fileObj.status = 'Cuota Excedida';
+            renderFileList();
+            updateProgress(
+              Math.round((completedFiles / totalFiles) * 100),
+              'Error: Todos los modelos de GEMINI han excedido el límite de uso (429).'
+            );
+            if (typeof showQuotaModal === 'function') showQuotaModal(errText);
+            break; // Stop remaining files loop
+          } else {
+            fileObj.status = 'Error';
+            renderFileList();
+            updateProgress(
+              Math.round((completedFiles / totalFiles) * 100),
+              `Error al procesar ${fileObj.name}`
+            );
+          }
+        }
+
+        renderFileList();
+      }
+
+      // Rebuild raw items and consolidate
+      rebuildAllRawItems();
+      consolidateData();
+      updateTnStatus();
+      renderConsolidatedTable();
+      renderRawTable();
+
+      const hasTnRequests = checkAndPromptTnCodes();
+      if (!hasTnRequests) {
+        finishAllProcessing(state.files.some(f => f.status === 'Cuota Excedida' || f.status === 'Error'));
+      } else {
+        state.isProcessing = false;
+        renderFileList();
+        updateProcessButtonState();
+        updateProgress(100, 'Esperando archivos PDF para los CÓDIGOS TN detectados...');
+      }
+    }
+
+    function updateProgress(percent, statusMsg) {
+      progressBarFill.style.width = percent + '%';
+      progressPercentText.textContent = percent + '%';
+      progressStatusText.textContent = statusMsg;
+    }
+
+    function addPreviewCard(fileName, pageNum, dataUrl) {
+      const card = document.createElement('div');
+      card.className = 'bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs p-2 text-center';
+      card.innerHTML = `
+        <img src="${dataUrl}" class="w-full h-48 object-contain bg-slate-50 border border-slate-100 rounded-lg mb-2" />
+        <p class="text-2xs font-bold text-slate-800 truncate">${fileName}</p>
+        <p class="text-2xs text-slate-500">Página ${pageNum}</p>
+      `;
+      previewGallery.appendChild(card);
+    }
+
+    // MODAL HELPER FUNCTIONS FOR QUOTA / RATE LIMIT (429)
+    function showQuotaModal({ type, title, message, modelAttempted, nextModel }) {
+      const modal = document.getElementById('quotaModal');
+      const modalTitle = document.getElementById('quotaModalTitle');
+      const modalBody = document.getElementById('quotaModalBody');
+      const modalHeader = document.getElementById('quotaModalHeader');
+      const modalIcon = document.getElementById('quotaModalIcon');
+
+      if (!modal || !modalTitle || !modalBody) return;
+
+      if (type === 'ALL_MODELS_EXCEEDED') {
+        modalHeader.className = 'bg-rose-50 border-b border-rose-200 px-6 py-4 flex items-center justify-between';
+        modalIcon.className = 'w-10 h-10 rounded-full bg-rose-100 border border-rose-300 flex items-center justify-center text-rose-700 text-xl font-bold shrink-0';
+        modalIcon.textContent = '🚫';
+        modalTitle.textContent = title || 'Límite de Cuota Excedido (Error 429)';
+        modalBody.innerHTML = `
+          <div class="space-y-2">
+            <p class="font-bold text-rose-900 text-sm">Se ha capturado el error "code": 429.</p>
+            <p class="text-slate-700 font-medium">Se ha excedido la cuota de uso de la funcionalidad para la API KEY utilizada.</p>
+            <div class="mt-3 p-3 bg-rose-100/80 border border-rose-300 rounded-xl text-rose-950 font-bold text-xs leading-normal">
+              ⚠️ Todos los modelos de GEMINI han excedido el límite de uso y no será posible procesar los archivos PDFs.
+            </div>
+          </div>
+        `;
+      } else if (type === 'RETRY_OTHER_MODEL') {
+        modalHeader.className = 'bg-amber-50 border-b border-amber-200 px-6 py-4 flex items-center justify-between';
+        modalIcon.className = 'w-10 h-10 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-700 text-xl font-bold shrink-0';
+        modalIcon.textContent = '⚠️';
+        modalTitle.textContent = title || 'Límite de Cuota Excedido (Error 429)';
+        modalBody.innerHTML = `
+          <div class="space-y-2">
+            <p class="font-bold text-amber-900 text-sm">Se ha capturado el error "code": 429.</p>
+            <p class="text-slate-700">Se ha excedido la cuota de uso de la funcionalidad para la API KEY utilizada con el modelo <span class="font-mono font-bold text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300">${modelAttempted || 'actual'}</span>.</p>
+            <div class="mt-3 p-3 bg-amber-100/80 border border-amber-300 rounded-xl text-amber-950 font-bold text-xs flex items-center gap-2">
+              <span class="animate-spin text-base">🔄</span>
+              <span>Reintentando utilizar otro modelo (${nextModel || 'Gemini Flash Alternative'})...</span>
+            </div>
+          </div>
+        `;
+      } else {
+        modalHeader.className = 'bg-amber-50 border-b border-amber-200 px-6 py-4 flex items-center justify-between';
+        modalIcon.className = 'w-10 h-10 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-700 text-xl font-bold shrink-0';
+        modalIcon.textContent = '⚠️';
+        modalTitle.textContent = title || 'Aviso de Cuota Gemini';
+        modalBody.innerHTML = `<p class="text-slate-700 font-medium">${message}</p>`;
+      }
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function hideQuotaModal() {
+      const modal = document.getElementById('quotaModal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    }
+
+    // Call Gemini API (Supports Express endpoint `/api/process-page` or direct REST API client-side)
+    async function callGeminiVisionAPI(imageBase64, apiKey) {
+      // Prompt specification from requirement:
+      const promptText = `Analiza el siguiente documento/tabla en la imagen. Extrae todos los renglones de la tabla detectando las siguientes columnas exactas:
+- CÓDIGO
+- MATRIC.
+- DESCRIPCIÓN
+- UNIDAD
+- CANT.
+
+La columna "Código" puede comenzar de dos formas: 
+- Si comienza por "MN" sigue un espacio en blanco y luego un número de 1, 2, 3 o 4 cifras donde, opcionalmente, puede seguir de una letra. Por ejemplo: "MN 202c".
+- Si comienza por "TN" o "ETN" sigue de un número de 1, 2, 3 o 4 cifras seguido, opcionalmente, de una letra. Por ejemplo: "TN142g"
+- El campo "MATRÍC." consta sólo de números de 6 dígitos.
+- El campo "UNIDAD" tendrá solamente valores "Pza", "Mts" o "Conj".
+- Si "CÓDIGO" está vacio o no tiene valor asignar el valor 0 a dicho campo.
+
+Devuelve un arreglo JSON de objetos con esta estructura exacta:
+[
+  { "codigo": "...", "matric": "...", "descripcion": "...", "unidad": "...", "cant": 0 }
+]
+Asegúrate de convertir el campo 'CANT.' a un número (float o int). Si un campo no existe o no es legible, coloca una cadena vacía o 0 para la cantidad.`;
+
+      // Strategy 1: Try server endpoint `/api/process-page` first
+      try {
+        const res = await fetch('/api/process-page', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: imageBase64,
+            customApiKey: apiKey,
+            model: 'gemini-3.6-flash'
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          return Array.isArray(data.items) ? data.items : [];
+        }
+
+        if (res.status === 429) {
+          const errData = await res.json().catch(() => ({}));
+          const finalMsg = errData.error || 'Todos los modelos de GEMINI han excedido el límite de uso y no será posible procesar los archivos PDFs.';
+          showQuotaModal({
+            type: 'ALL_MODELS_EXCEEDED',
+            title: '🚫 Cuota Excedida en Todos los Modelos',
+            message: finalMsg
+          });
+          throw new Error(finalMsg);
+        }
+      } catch (err) {
+        if (err.message && err.message.includes('Todos los modelos de GEMINI')) {
+          throw err;
+        }
+        console.warn('Servidor no disponible, ejecutando petición directa a la API de Gemini desde el navegador...');
+      }
+
+      // Strategy 2: Direct REST request to Google Gemini API
+      const keyToUse = apiKey || state.apiKey;
+      const clientModels = ['gemini-3.6-flash', 'gemini-flash-latest'];
+
+      const payload = {
+        contents: [{
+          parts: [
+            { inlineData: { mimeType: 'image/jpeg', data: imageBase64 } },
+            { text: promptText }
+          ]
+        }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.1
+        }
+      };
+
+      let lastErr = null;
+      let allRateLimited = true;
+
+      for (let i = 0; i < clientModels.length; i++) {
+        const mName = clientModels[i];
+
+        for (let attempt = 1; attempt <= 4; attempt++) {
+          try {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${mName}:generateContent?key=${keyToUse}`;
+            const response = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+              const resData = await response.json();
+              const textOutput = resData.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+              try {
+                const parsed = JSON.parse(textOutput);
+                return Array.isArray(parsed) ? parsed : [];
+              } catch (e) {
+                const cleaned = textOutput.replace(/```json/g, '').replace(/```/g, '').trim();
+                return JSON.parse(cleaned) || [];
+              }
+            } else {
+              const errJson = await response.json().catch(() => ({}));
+              const errMsg = errJson.error?.message || `Error ${response.status} en Gemini (${mName})`;
+              lastErr = new Error(errMsg);
+
+              const is429 = response.status === 429 || errMsg.includes('429') || errMsg.includes('Quota exceeded') || errMsg.includes('RESOURCE_EXHAUSTED');
+
+              if (is429) {
+                // If there is another model to try
+                if (i < clientModels.length - 1) {
+                  const nextModel = clientModels[i + 1];
+                  showQuotaModal({
+                    type: 'RETRY_OTHER_MODEL',
+                    modelAttempted: mName,
+                    nextModel: nextModel,
+                    title: '⚠️ Límite de Cuota Excedido (Error 429)'
+                  });
+                }
+
+                if (attempt < 4) {
+                  let delayMs = Math.pow(2, attempt) * 2000;
+                  const match = errMsg.match(/retry in ([0-9.]+)s/i);
+                  if (match && match[1]) {
+                    const parsedSec = parseFloat(match[1]);
+                    if (!isNaN(parsedSec) && parsedSec > 0) {
+                      delayMs = Math.min(Math.ceil(parsedSec * 1000) + 1000, 15000);
+                    }
+                  }
+                  console.log(`Límite de cuota alcanzado (429). Esperando ${delayMs / 1000}s para reintentar...`);
+                  await new Promise(r => setTimeout(r, delayMs));
+                  continue;
+                }
+              } else {
+                allRateLimited = false;
+              }
+            }
+          } catch (e) {
+            lastErr = e;
+          }
+          await new Promise(r => setTimeout(r, 1000 * attempt));
+        }
+      }
+
+      const errStr = String(lastErr?.message || lastErr || '');
+      if (allRateLimited || errStr.includes('429') || errStr.includes('Quota exceeded') || errStr.includes('RESOURCE_EXHAUSTED')) {
+        const finalMsg = 'Todos los modelos de GEMINI han excedido el límite de uso y no será posible procesar los archivos PDFs.';
+        showQuotaModal({
+          type: 'ALL_MODELS_EXCEEDED',
+          title: '🚫 Cuota Excedida en Todos los Modelos',
+          message: finalMsg
+        });
+        throw new Error(finalMsg);
+      }
+
+      throw lastErr || new Error('No se pudo procesar la imagen.');
+    }
+
+    // NORMALIZATION AND CONSOLIDATION LOGIC
+    function normalizeCodigo(val) {
+      if (!val) return "0";
+      let str = String(val).trim();
+      if (str === "" || str === "0" || str === "null" || str === "undefined") return "0";
+      return str;
+    }
+
+    function normalizeMatric(val) {
+      if (!val) return "";
+      let str = String(val).trim().replace(/[^0-9]/g, '');
+      return str;
+    }
+
+    function normalizeUnidad(val) {
+      if (!val) return "Pza";
+      let str = String(val).trim();
+      let lower = str.toLowerCase();
+      if (lower.includes('pza') || lower.includes('piez') || lower.includes('pz')) return 'Pza';
+      if (lower.includes('mts') || lower.includes('metr') || lower.includes('m')) return 'Mts';
+      if (lower.includes('conj') || lower.includes('juego') || lower.includes('cj')) return 'Conj';
+      return str;
+    }
+
+    function normalizeCant(val) {
+      if (typeof val === 'number') return isNaN(val) ? 0 : val;
+      if (!val) return 0;
+      let str = String(val).replace(',', '.').replace(/[^0-9.]/g, '');
+      let num = parseFloat(str);
+      return isNaN(num) ? 0 : num;
+    }
+
+    function consolidateData() {
+      const items = state.allRawItems;
+      const consolidatedMap = new Map();
+      const zeroCodeItems = [];
+
+      for (const rawItem of items) {
+        const normCode = normalizeCodigo(rawItem.codigo);
+        const normMatric = normalizeMatric(rawItem.matric);
+        const normDesc = (rawItem.descripcion || '').trim();
+        const normUnit = normalizeUnidad(rawItem.unidad);
+        const normCant = normalizeCant(rawItem.cant);
+        const sourceStr = `${rawItem.sourceFile || 'PDF'} (Pág. ${rawItem.sourcePage || 1})`;
+
+        if (normCode !== "0") {
+          // Group by CÓDIGO
+          if (consolidatedMap.has(normCode)) {
+            const existing = consolidatedMap.get(normCode);
+            existing.cant += normCant;
+            existing.occurrenceCount = (existing.occurrenceCount || 1) + 1;
+            if (!existing.matric && normMatric) existing.matric = normMatric;
+            if (!existing.descripcion && normDesc) existing.descripcion = normDesc;
+            if (!existing.unidad && normUnit) existing.unidad = normUnit;
+            existing.sources.push(sourceStr);
+          } else {
+            consolidatedMap.set(normCode, {
+              codigo: normCode,
+              matric: normMatric,
+              descripcion: normDesc,
+              unidad: normUnit,
+              cant: normCant,
+              occurrenceCount: 1,
+              sources: [sourceStr]
+            });
+          }
+        } else {
+          // CÓDIGO is 0
+          zeroCodeItems.push({
+            codigo: "0",
+            matric: normMatric,
+            descripcion: normDesc,
+            unidad: normUnit,
+            cant: normCant,
+            occurrenceCount: 1,
+            sources: [sourceStr]
+          });
+        }
+      }
+
+      // Consolidate zero code items based on MATRÍC. equality or DESCRIPCIÓN
+      const zeroCodeGrouped = [];
+
+      for (const item of zeroCodeItems) {
+        let matched = false;
+
+        // Check MATRIC equality if MATRIC exists
+        if (item.matric && item.matric.length >= 4) {
+          for (const existing of zeroCodeGrouped) {
+            if (existing.matric === item.matric) {
+              existing.cant += item.cant;
+              existing.occurrenceCount = (existing.occurrenceCount || 1) + 1;
+              if (!existing.descripcion && item.descripcion) existing.descripcion = item.descripcion;
+              if (!existing.unidad && item.unidad) existing.unidad = item.unidad;
+              existing.sources.push(item.sources[0]);
+              matched = true;
+              break;
+            }
+          }
+        }
+
+        // If not matched by matric, check by description
+        if (!matched && item.descripcion) {
+          const descKey = item.descripcion.toLowerCase();
+          for (const existing of zeroCodeGrouped) {
+            if (existing.descripcion && existing.descripcion.toLowerCase() === descKey) {
+              existing.cant += item.cant;
+              existing.occurrenceCount = (existing.occurrenceCount || 1) + 1;
+              if (!existing.matric && item.matric) existing.matric = item.matric;
+              existing.sources.push(item.sources[0]);
+              matched = true;
+              break;
+            }
+          }
+        }
+
+        // Add as separate element if still not matched
+        if (!matched) {
+          zeroCodeGrouped.push({ ...item });
+        }
+      }
+
+      state.consolidatedItems = [...consolidatedMap.values(), ...zeroCodeGrouped];
+
+      // Count repeated items for metrics badge
+      const repeatedCount = state.consolidatedItems.filter(item => (item.occurrenceCount > 1) || (item.sources && item.sources.length > 1)).length;
+      const repeatedMetricBadge = document.getElementById('repeatedMetricBadge');
+      if (repeatedMetricBadge) {
+        repeatedMetricBadge.textContent = `${repeatedCount} elementos repetidos`;
+      }
+
+      // Update UI counts & tables
+      rawBadge.textContent = state.allRawItems.length;
+      consolidatedBadge.textContent = state.consolidatedItems.length;
+      metricConsolidatedCount.textContent = state.consolidatedItems.length;
+
+      const totalCantSum = state.consolidatedItems.reduce((acc, curr) => acc + curr.cant, 0);
+      metricTotalCant.textContent = totalCantSum % 1 === 0 ? totalCantSum.toLocaleString() : totalCantSum.toFixed(2);
+
+      renderConsolidatedTable();
+      renderRawTable();
+    }
+
+    // Render Consolidated Table
+    function renderConsolidatedTable() {
+      const searchTerm = tableSearchInput.value.toLowerCase().trim();
+      const filtered = state.consolidatedItems.filter(item => {
+        if (!searchTerm) return true;
+        return (item.codigo || '').toLowerCase().includes(searchTerm) ||
+               (item.matric || '').toLowerCase().includes(searchTerm) ||
+               (item.descripcion || '').toLowerCase().includes(searchTerm);
+      });
+
+      if (filtered.length === 0) {
+        consolidatedTableBody.innerHTML = `
+          <tr>
+            <td colspan="6" class="py-12 text-center text-slate-400">
+              ${state.consolidatedItems.length === 0 ? 'Aún no se han procesado tablas de PDFs.' : 'No se encontraron ítems coincidentes con el filtro de búsqueda.'}
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      consolidatedTableBody.innerHTML = '';
+      filtered.forEach((item, idx) => {
+        const isRepeated = (item.occurrenceCount > 1) || (item.sources && item.sources.length > 1);
+        const tr = document.createElement('tr');
+        
+        if (isRepeated) {
+          tr.className = 'bg-amber-50/90 hover:bg-amber-100/90 transition-colors border-b border-amber-200/80 text-slate-900';
+        } else {
+          tr.className = 'bg-white hover:bg-slate-50 transition-colors border-b border-slate-100 text-slate-800';
+        }
+
+        const codeClass = item.codigo === '0' ? 'text-slate-400 italic font-mono' : 'font-bold font-mono text-emerald-800';
+
+        const codeCellContent = `
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="${codeClass}">${item.codigo}</span>
+            ${isRepeated ? `<span class="px-1.5 py-0.5 rounded bg-amber-200 text-amber-950 font-extrabold text-2xs border border-amber-300 shadow-2xs whitespace-nowrap" title="Elemento repetido en ${item.sources ? item.sources.length : item.occurrenceCount} ubicaciones">🔁 Repetido (${item.sources ? item.sources.length : item.occurrenceCount})</span>` : ''}
+          </div>
+        `;
+
+        const sourcesListHtml = item.sources && item.sources.length > 0
+          ? `<div class="flex flex-col gap-1 py-1">
+              ${item.sources.map(src => `
+                <span class="inline-flex items-center gap-1 text-2xs ${isRepeated ? 'bg-amber-100/90 text-amber-950 border-amber-300 font-semibold' : 'bg-slate-100 text-slate-700 border-slate-200 font-medium'} border px-2 py-0.5 rounded-md w-fit shadow-2xs">
+                  📄 ${src}
+                </span>
+              `).join('')}
+             </div>`
+          : '<span class="text-slate-400 text-2xs">-</span>';
+
+        tr.innerHTML = `
+          <td class="py-3 px-4">${codeCellContent}</td>
+          <td class="py-3 px-4 font-mono ${isRepeated ? 'text-slate-950 font-semibold' : 'text-slate-700'}">${item.matric || '-'}</td>
+          <td class="py-3 px-4 font-medium ${isRepeated ? 'text-slate-950' : 'text-slate-900'}">${item.descripcion || '-'}</td>
+          <td class="py-3 px-4 text-center">
+            <span class="px-2 py-0.5 rounded ${isRepeated ? 'bg-amber-200/60 text-amber-950 font-bold' : 'bg-slate-100 text-slate-700 font-semibold'} text-2xs">${item.unidad}</span>
+          </td>
+          <td class="py-3 px-4 text-right font-extrabold ${isRepeated ? 'text-amber-950 bg-amber-100/50' : 'text-emerald-700 bg-emerald-50/30'}">${item.cant % 1 === 0 ? item.cant : item.cant.toFixed(2)}</td>
+          <td class="py-3 px-4">${sourcesListHtml}</td>
+        `;
+        consolidatedTableBody.appendChild(tr);
+      });
+    }
+
+    // Render Raw Table
+    function renderRawTable() {
+      const searchTerm = tableSearchInput.value.toLowerCase().trim();
+      const filtered = state.allRawItems.filter(item => {
+        if (!searchTerm) return true;
+        return (item.codigo || '').toLowerCase().includes(searchTerm) ||
+               (item.matric || '').toLowerCase().includes(searchTerm) ||
+               (item.descripcion || '').toLowerCase().includes(searchTerm);
+      });
+
+      if (filtered.length === 0) {
+        rawTableBody.innerHTML = `
+          <tr>
+            <td colspan="7" class="py-12 text-center text-slate-400">Sin registros individuales extraídos.</td>
+          </tr>
+        `;
+        return;
+      }
+
+      rawTableBody.innerHTML = '';
+      filtered.forEach((item, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition-colors border-b border-slate-100';
+
+        tr.innerHTML = `
+          <td class="py-2.5 px-4 text-center text-slate-400 font-mono text-2xs">${idx + 1}</td>
+          <td class="py-2.5 px-4 font-bold font-mono text-slate-800">${item.codigo || '0'}</td>
+          <td class="py-2.5 px-4 font-mono text-slate-600">${item.matric || '-'}</td>
+          <td class="py-2.5 px-4 text-slate-800">${item.descripcion || '-'}</td>
+          <td class="py-2.5 px-4 text-center text-slate-600 text-2xs">${item.unidad || 'Pza'}</td>
+          <td class="py-2.5 px-4 text-right font-bold text-slate-900">${item.cant}</td>
+          <td class="py-2.5 px-4 text-slate-500 text-2xs truncate max-w-xs">${item.sourceFile} (Pág. ${item.sourcePage})</td>
+        `;
+        rawTableBody.appendChild(tr);
+      });
+    }
+
+    // EXPORT TO EXCEL (.xlsx)
+    function exportToExcel() {
+      if (state.consolidatedItems.length === 0) {
+        alert('No hay datos consolidados para exportar.');
+        return;
+      }
+
+      // Prepare Excel rows array with exact official headers
+      const excelRows = state.consolidatedItems.map(item => ({
+        "CÓDIGO": item.codigo,
+        "MATRIC.": item.matric,
+        "DESCRIPCIÓN": item.descripcion,
+        "UNIDAD": item.unidad,
+        "CANT.": item.cant
+      }));
+
+      // Create SheetJS Worksheet & Workbook
+      const worksheet = XLSX.utils.json_to_sheet(excelRows);
+
+      // Define Column Widths
+      worksheet['!cols'] = [
+        { wch: 16 }, // CÓDIGO
+        { wch: 14 }, // MATRIC.
+        { wch: 50 }, // DESCRIPCIÓN
+        { wch: 12 }, // UNIDAD
+        { wch: 12 }  // CANT.
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Tabla Consolidada");
+
+      // Generate & Download Excel File
+      XLSX.writeFile(workbook, "Reporte_Consolidado_PDFs.xlsx");
+    }
+
+    // TN CODE DETECTION AND SUB-FILE PROCESSING LOGIC
+    function isTnCode(code) {
+      if (!code) return false;
+      const str = String(code).trim().toUpperCase();
+      return str.startsWith('TN');
+    }
+
+    function getTnKey(code) {
+      if (!code) return '';
+      let str = String(code).trim().toUpperCase();
+      return str.replace(/[\s\-_.]/g, '');
+    }
+
+    function updateTnStatus() {
+      const tnMap = new Map();
+
+      for (const item of state.allRawItems) {
+        if (isTnCode(item.codigo)) {
+          const key = getTnKey(item.codigo);
+          const cant = normalizeCant(item.cant);
+          if (cant > 0) {
+            if (tnMap.has(key)) {
+              tnMap.get(key).multiplier += cant;
+            } else {
+              tnMap.set(key, {
+                code: item.codigo.trim(),
+                key: key,
+                multiplier: cant
+              });
+            }
+          }
+        }
+      }
+
+      const updatedPending = [];
+
+      for (const [key, info] of tnMap.entries()) {
+        if (!state.resolvedTnKeys.has(key)) {
+          const existing = pendingTnCodes.find(p => p.key === key);
+          const files = existing ? existing.files : [];
+          updatedPending.push({
+            code: info.code,
+            key: key,
+            multiplier: info.multiplier,
+            files: files
+          });
+        }
+      }
+
+      pendingTnCodes = updatedPending;
+
+      const openTnModalBtn = document.getElementById('openTnModalBtn');
+      const tnBadgeCount = document.getElementById('tnBadgeCount');
+
+      if (openTnModalBtn) {
+        if (pendingTnCodes.length > 0) {
+          openTnModalBtn.classList.remove('hidden');
+          if (tnBadgeCount) tnBadgeCount.textContent = pendingTnCodes.length;
+        } else {
+          openTnModalBtn.classList.add('hidden');
+        }
+      }
+
+      renderTnModalContent();
+    }
+
+    function checkAndPromptTnCodes() {
+      updateTnStatus();
+      if (pendingTnCodes.length > 0) {
+        showTnModal();
+        return true;
+      }
+      return false;
+    }
+
+    function renderTnModalContent() {
+      const container = document.getElementById('tnCodesContainer');
+      if (!container) return;
+
+      container.innerHTML = '';
+
+      pendingTnCodes.forEach(tn => {
+        const card = document.createElement('div');
+        card.className = 'bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3';
+
+        let filesListHtml = '';
+        if (tn.files.length === 0) {
+          filesListHtml = `<p class="text-2xs text-slate-400 italic">No se ha adjuntado ningún PDF para este código aún.</p>`;
+        } else {
+          filesListHtml = tn.files.map((file, fIdx) => `
+            <div class="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-2xs">
+              <div class="flex items-center gap-2 truncate">
+                <span class="text-rose-600">📄</span>
+                <span class="font-medium text-slate-800 text-2xs truncate">${file.name}</span>
+                <span class="text-slate-400 text-2xs">(${formatBytes(file.size)})</span>
+              </div>
+              <button type="button" onclick="removeTnFile('${tn.key}', ${fIdx})" class="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1 rounded transition-colors text-xs" title="Quitar archivo">
+                ✕
+              </button>
+            </div>
+          `).join('');
+        }
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-1 rounded-lg bg-amber-100 text-amber-900 border border-amber-300 font-mono font-extrabold text-xs">
+                CÓDIGO: ${tn.code}
+              </span>
+              <span class="text-2xs text-slate-600">
+                Suma acumulada CANT.: <b class="text-amber-900 text-xs">${tn.multiplier}</b>
+              </span>
+            </div>
+            <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-2xs border border-emerald-200">
+              Factor Multiplicador x${tn.multiplier}
+            </span>
+          </div>
+
+          <div class="space-y-1.5">
+            ${filesListHtml}
+          </div>
+
+          <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-200/60">
+            <div class="flex items-center gap-2">
+              <input type="file" id="tnFileInput_${tn.key}" accept=".pdf" multiple class="hidden" />
+              <button type="button" onclick="triggerTnFileInput('${tn.key}')" class="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-2xs font-semibold shadow-2xs flex items-center gap-1.5 cursor-pointer">
+                📁 Adjuntar PDF para ${tn.code}
+              </button>
+            </div>
+            <span class="text-2xs text-slate-400">Total adjuntados: ${tn.files.length}</span>
+          </div>
+        `;
+
+        container.appendChild(card);
+
+        setTimeout(() => {
+          const inputEl = document.getElementById(`tnFileInput_${tn.key}`);
+          if (inputEl) {
+            inputEl.addEventListener('change', (e) => {
+              if (e.target.files && e.target.files.length > 0) {
+                Array.from(e.target.files).forEach(f => {
+                  tn.files.push(f);
+                });
+                renderTnModalContent();
+                updateProcessTnBtnState();
+              }
+            });
+          }
+        }, 0);
+      });
+
+      updateProcessTnBtnState();
+    }
+
+    window.triggerTnFileInput = function(tnKey) {
+      const inputEl = document.getElementById(`tnFileInput_${tnKey}`);
+      if (inputEl) inputEl.click();
+    };
+
+    window.removeTnFile = function(tnKey, fileIndex) {
+      const tnGroup = pendingTnCodes.find(p => p.key === tnKey);
+      if (tnGroup) {
+        tnGroup.files.splice(fileIndex, 1);
+        renderTnModalContent();
+        updateProcessTnBtnState();
+      }
+    };
+
+    function updateProcessTnBtnState() {
+      const processBtn = document.getElementById('processTnFilesBtn');
+      if (!processBtn) return;
+      const hasFiles = pendingTnCodes.some(p => p.files.length > 0);
+      processBtn.disabled = !hasFiles;
+    }
+
+    function showTnModal() {
+      const modal = document.getElementById('tnModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+    }
+
+    function hideTnModal() {
+      const modal = document.getElementById('tnModal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    }
+
+    function handleGeneralTnFiles(fileList) {
+      const added = Array.from(fileList).filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+      if (added.length === 0) return;
+
+      added.forEach(file => {
+        const fClean = file.name.toUpperCase().replace(/[\s\-_.]/g, '');
+        let matched = false;
+
+        for (const tn of pendingTnCodes) {
+          if (fClean.includes(tn.key)) {
+            tn.files.push(file);
+            matched = true;
+            break;
+          }
+        }
+
+        if (!matched && pendingTnCodes.length === 1) {
+          pendingTnCodes[0].files.push(file);
+          matched = true;
+        }
+
+        if (!matched && pendingTnCodes.length > 0) {
+          pendingTnCodes[0].files.push(file);
+        }
+      });
+
+      renderTnModalContent();
+      updateProcessTnBtnState();
+    }
+
+    async function processTnFiles() {
+      hideTnModal();
+
+      const filesToProcess = [];
+      for (const tnGroup of pendingTnCodes) {
+        state.resolvedTnKeys.add(tnGroup.key);
+
+        for (const file of tnGroup.files) {
+          filesToProcess.push({
+            file: file,
+            tnCode: tnGroup.code,
+            tnKey: tnGroup.key,
+            multiplier: tnGroup.multiplier || 1
+          });
+        }
+      }
+
+      if (filesToProcess.length === 0) {
+        finishAllProcessing();
+        return;
+      }
+
+      // Step 1: Create all fileObj objects immediately and add them ALL at once to state.files
+      const newFileObjs = filesToProcess.map(task => ({
+        id: 'file_' + Math.random().toString(36).substr(2, 9),
+        name: task.file.name,
+        size: task.file.size,
+        file: task.file,
+        status: 'Pendiente',
+        numPages: '...',
+        rawItems: [],
+        pagePreviews: [],
+        isSubTn: true,
+        tnCode: task.tnCode,
+        multiplier: task.multiplier
+      }));
+
+      state.files.push(...newFileObjs);
+
+      // Render immediately so ALL new TN files appear in fileTableBody at once alongside previously processed files
+      renderFileList();
+
+      state.isProcessing = true;
+      if (processPdfsBtn) processPdfsBtn.disabled = true;
+      progressContainer.classList.remove('hidden');
+
+      const currentKey = apiKeyInput.value.trim() || state.apiKey;
+      let totalFiles = state.files.length;
+      let completedFiles = state.files.filter(f => f.status === 'Completado').length;
+
+      for (let i = 0; i < newFileObjs.length; i++) {
+        const fileObj = newFileObjs[i];
+
+        fileObj.status = 'Procesando';
+        renderFileList();
+
+        const currentPercent = Math.round((completedFiles / totalFiles) * 100);
+        updateProgress(
+          currentPercent,
+          `Procesando despiece ${fileObj.tnCode} (${i + 1}/${newFileObjs.length}): ${fileObj.name}`
+        );
+
+        try {
+          const arrayBuffer = await fileObj.file.arrayBuffer();
+          const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+          fileObj.numPages = pdfDoc.numPages;
+          renderFileList();
+
+          fileObj.rawItems = [];
+
+          for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+            updateProgress(
+              currentPercent,
+              `Analizando pág. ${pageNum}/${pdfDoc.numPages} de ${fileObj.name} [${fileObj.tnCode} x${fileObj.multiplier}]...`
+            );
+
+            const page = await pdfDoc.getPage(pageNum);
+            const viewport = page.getViewport({ scale: 2.0 });
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            context.fillStyle = '#FFFFFF';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+
+            await page.render({ canvasContext: context, viewport: viewport }).promise;
+
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            const base64Image = dataUrl.split(',')[1];
+
+            addPreviewCard(`${fileObj.name} (${fileObj.tnCode})`, pageNum, dataUrl);
+
+            const extractedItems = await callGeminiVisionAPI(base64Image, currentKey);
+
+            extractedItems.forEach(item => {
+              const rawCant = normalizeCant(item.cant);
+              const multipliedCant = rawCant * (fileObj.multiplier || 1);
+              const sourceTag = `${fileObj.name} [Despiece ${fileObj.tnCode} x${fileObj.multiplier}]`;
+
+              const itemWithMeta = {
+                ...item,
+                cant: multipliedCant,
+                sourceFile: sourceTag,
+                sourcePage: pageNum
+              };
+
+              fileObj.rawItems.push(itemWithMeta);
+            });
+
+            if (pageNum < pdfDoc.numPages) {
+              await new Promise(r => setTimeout(r, 1500));
+            }
+          }
+
+          fileObj.status = 'Completado';
+          completedFiles++;
+          updateProgress(
+            Math.round((completedFiles / totalFiles) * 100),
+            `Procesado ${fileObj.name} para ${fileObj.tnCode}`
+          );
+        } catch (err) {
+          console.error('Error procesando sub-PDF TN:', err);
+          const errText = String(err.message || err || '');
+          if (errText.includes('Todos los modelos de GEMINI') || errText.includes('429') || errText.includes('Quota exceeded') || errText.includes('RESOURCE_EXHAUSTED')) {
+            fileObj.status = 'Cuota Excedida';
+            renderFileList();
+            updateProgress(
+              Math.round((completedFiles / totalFiles) * 100),
+              'Error: Todos los modelos de GEMINI han excedido el límite de uso (429).'
+            );
+            if (typeof showQuotaModal === 'function') showQuotaModal(errText);
+            break;
+          } else {
+            fileObj.status = 'Error';
+            renderFileList();
+            updateProgress(
+              Math.round((completedFiles / totalFiles) * 100),
+              `Error al procesar ${fileObj.name}`
+            );
+          }
+        }
+
+        renderFileList();
+      }
+
+      rebuildAllRawItems();
+      consolidateData();
+
+      const hasMoreTn = checkAndPromptTnCodes();
+      if (!hasMoreTn) {
+        finishAllProcessing(state.files.some(f => f.status === 'Cuota Excedida' || f.status === 'Error'));
+      } else {
+        state.isProcessing = false;
+        renderFileList();
+        updateProcessButtonState();
+      }
+    }
+
+    // Individual File Retry Function
+    window.retrySingleFile = async function(fileId) {
+      if (state.isProcessing) return;
+
+      const fileObj = state.files.find(f => f.id === fileId);
+      if (!fileObj || !fileObj.file) return;
+
+      const currentKey = apiKeyInput.value.trim() || state.apiKey;
+      if (!state.hasServerKey && (!currentKey || currentKey.length < 5)) {
+        alert('Por favor ingresa una API Key válida de Google Gemini antes de continuar.');
+        return;
+      }
+
+      state.isProcessing = true;
+      if (processPdfsBtn) processPdfsBtn.disabled = true;
+      progressContainer.classList.remove('hidden');
+
+      updateProgress(0, `Reintentando análisis de: ${fileObj.name}...`);
+
+      fileObj.status = 'Procesando';
+      fileObj.rawItems = [];
+      renderFileList();
+
+      try {
+        const arrayBuffer = await fileObj.file.arrayBuffer();
+        const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        fileObj.numPages = pdfDoc.numPages;
+        renderFileList();
+
+        for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+          updateProgress(
+            Math.round((pageNum / pdfDoc.numPages) * 100),
+            `Reintentando pág. ${pageNum}/${pdfDoc.numPages} de ${fileObj.name}...`
+          );
+
+          const page = await pdfDoc.getPage(pageNum);
+          const viewport = page.getViewport({ scale: 2.0 });
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          canvas.height = viewport.height;
+          canvas.width = viewport.width;
+
+          context.fillStyle = '#FFFFFF';
+          context.fillRect(0, 0, canvas.width, canvas.height);
+
+          await page.render({ canvasContext: context, viewport: viewport }).promise;
+
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          const base64Image = dataUrl.split(',')[1];
+
+          addPreviewCard(fileObj.name + (fileObj.tnCode ? ` [${fileObj.tnCode}]` : ''), pageNum, dataUrl);
+
+          const extractedItems = await callGeminiVisionAPI(base64Image, currentKey);
+
+          extractedItems.forEach(item => {
+            let itemWithMeta;
+            if (fileObj.isSubTn) {
+              const rawCant = normalizeCant(item.cant);
+              const multipliedCant = rawCant * (fileObj.multiplier || 1);
+              const sourceTag = `${fileObj.name} [Despiece ${fileObj.tnCode} x${fileObj.multiplier}]`;
+              itemWithMeta = {
+                ...item,
+                cant: multipliedCant,
+                sourceFile: sourceTag,
+                sourcePage: pageNum
+              };
+            } else {
+              itemWithMeta = {
+                ...item,
+                sourceFile: fileObj.name,
+                sourcePage: pageNum
+              };
+            }
+            fileObj.rawItems.push(itemWithMeta);
+          });
+
+          if (pageNum < pdfDoc.numPages) {
+            await new Promise(r => setTimeout(r, 1500));
+          }
+        }
+
+        fileObj.status = 'Completado';
+        updateProgress(100, `¡Reintento completado para ${fileObj.name}!`);
+      } catch (err) {
+        console.error('Error al reintentar:', err);
+        const errText = String(err.message || err || '');
+        if (errText.includes('Todos los modelos de GEMINI') || errText.includes('429') || errText.includes('Quota exceeded') || errText.includes('RESOURCE_EXHAUSTED')) {
+          fileObj.status = 'Cuota Excedida';
+          if (typeof showQuotaModal === 'function') showQuotaModal(errText);
+        } else {
+          fileObj.status = 'Error';
+        }
+      }
+
+      rebuildAllRawItems();
+      consolidateData();
+      updateTnStatus();
+      renderConsolidatedTable();
+      renderRawTable();
+
+      finishAllProcessing(fileObj.status === 'Cuota Excedida' || fileObj.status === 'Error');
+    };
+
+    function finishAllProcessing(isErrorOrQuota = false) {
+      if (!isErrorOrQuota) {
+        updateProgress(100, '¡Procesamiento finalizado con éxito!');
+        setTimeout(() => {
+          progressContainer.classList.add('hidden');
+        }, 3000);
+      } else {
+        setTimeout(() => {
+          progressContainer.classList.add('hidden');
+        }, 1000);
+      }
+
+      state.isProcessing = false;
+      renderFileList();
+      updateProcessButtonState();
+      exportExcelBtn.disabled = state.consolidatedItems.length === 0;
+    }
+
+    // Initialize on DOM load
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+
+  <!-- TN Code File Request Modal -->
+  <div id="tnModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 transition-opacity">
+    <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden transform transition-all animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+      <!-- Header -->
+      <div class="bg-amber-50 border-b border-amber-200 px-6 py-4 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-700 text-xl font-bold shrink-0">
+            📦
+          </div>
+          <div>
+            <h3 class="font-bold text-slate-900 text-base leading-tight">
+              Archivos Requeridos para CÓDIGOS "TN"
+            </h3>
+            <p class="text-xs text-slate-500">Se detectaron ítems cuya clave comienza con TN. Adjunta sus PDFs para desglosar sus componentes.</p>
+          </div>
+        </div>
+        <button id="closeTnModalBtn" type="button" class="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-lg hover:bg-amber-100/50 cursor-pointer">
+          ✕
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="p-6 overflow-y-auto space-y-4 flex-1 text-xs">
+        <div class="p-3 bg-amber-50/80 border border-amber-200/80 rounded-xl text-amber-950 space-y-1">
+          <p class="font-bold text-xs flex items-center gap-1.5">
+            <span>⚠️</span> CÓDIGOS "TN" detectados en los PDFs procesados:
+          </p>
+          <p class="text-2xs leading-relaxed text-amber-900">
+            Los archivos que adjuntes serán analizados individualmente por la IA. Las cantidades de sus ítems se multiplicarán automáticamente por la suma total del campo <b>CANT.</b> en la que aparece cada código TN.
+          </p>
+        </div>
+
+        <!-- General Dropzone -->
+        <div id="tnGeneralDropzone" class="border-2 border-dashed border-amber-300 hover:border-amber-500 bg-amber-50/40 hover:bg-amber-100/50 rounded-2xl p-4 text-center cursor-pointer transition-all">
+          <input type="file" id="tnGeneralFileInput" accept=".pdf" multiple class="hidden" />
+          <p class="text-xs font-semibold text-amber-900">
+            Arrastra o haz clic aquí para adjuntar los PDFs de desglose
+          </p>
+          <p class="text-2xs text-amber-700/80 mt-0.5">
+            Se asignarán automáticamente al código TN correspondiente si el nombre del archivo coincide.
+          </p>
+        </div>
+
+        <!-- TN Codes Cards Container -->
+        <div id="tnCodesContainer" class="space-y-3">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="bg-slate-50 border-t border-slate-100 px-6 py-3.5 flex items-center justify-between shrink-0">
+        <button id="skipTnModalBtn" type="button" class="px-4 py-2 text-slate-500 hover:text-slate-800 font-medium text-xs rounded-xl hover:bg-slate-200/60 transition-colors cursor-pointer">
+          Omitir y Finalizar
+        </button>
+        <button id="processTnFilesBtn" type="button" disabled class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center gap-2 cursor-pointer disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          Procesar Archivos Agregados
+        </button>
+      </div>
+    </div>
+  </div>
+  <!-- Quota / 429 Error Modal -->
+  <div id="quotaModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 transition-opacity">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden transform transition-all animate-in fade-in zoom-in duration-200">
+      <div id="quotaModalHeader" class="bg-amber-50 border-b border-amber-200 px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div id="quotaModalIcon" class="w-10 h-10 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-700 text-xl font-bold shrink-0">
+            ⚠️
+          </div>
+          <h3 id="quotaModalTitle" class="font-bold text-slate-900 text-base leading-tight">
+            Límite de Cuota Excedido (Error 429)
+          </h3>
+        </div>
+        <button id="closeQuotaModalBtn" type="button" class="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-lg hover:bg-amber-100/50 cursor-pointer">
+          ✕
+        </button>
+      </div>
+      
+      <div class="p-6 space-y-4 text-xs text-slate-700 leading-relaxed">
+        <div id="quotaModalBody" class="space-y-2">
+          <!-- Dynamically filled message -->
+        </div>
+
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-2xs text-slate-500 space-y-1">
+          <p class="font-semibold text-slate-700">💡 Sugerencia:</p>
+          <p>Puedes ingresar una <b>API Key propia de Google Gemini</b> en la barra de configuración superior para continuar procesando sin límites de cuota compartida.</p>
+        </div>
+      </div>
+
+      <div class="bg-slate-50 border-t border-slate-100 px-6 py-3.5 flex items-center justify-end">
+        <button id="acceptQuotaModalBtn" type="button" class="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer">
+          Entendido
+        </button>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
