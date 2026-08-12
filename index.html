@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Procesamiento y cálculo de TNs</title>
   <link rel="icon" href="/favicon.png" type="image/png" sizes="32x32">
+
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -505,11 +506,24 @@
       const acceptQuotaModalBtn = document.getElementById('acceptQuotaModalBtn');
       const quotaModal = document.getElementById('quotaModal');
 
-      if (closeQuotaModalBtn) closeQuotaModalBtn.addEventListener('click', hideQuotaModal);
-      if (acceptQuotaModalBtn) acceptQuotaModalBtn.addEventListener('click', hideQuotaModal);
+      if (closeQuotaModalBtn) {
+        closeQuotaModalBtn.addEventListener('click', () => {
+          hideQuotaModal();
+          if (typeof window.focusApiKeyInput === 'function') window.focusApiKeyInput();
+        });
+      }
+      if (acceptQuotaModalBtn) {
+        acceptQuotaModalBtn.addEventListener('click', () => {
+          hideQuotaModal();
+          if (typeof window.focusApiKeyInput === 'function') window.focusApiKeyInput();
+        });
+      }
       if (quotaModal) {
         quotaModal.addEventListener('click', (e) => {
-          if (e.target === quotaModal) hideQuotaModal();
+          if (e.target === quotaModal) {
+            hideQuotaModal();
+            if (typeof window.focusApiKeyInput === 'function') window.focusApiKeyInput();
+          }
         });
       }
 
@@ -1002,23 +1016,34 @@
         } catch (err) {
           console.error('Error procesando PDF:', err);
           const errText = String(err.message || err || '');
-          if (errText.includes('Todos los modelos de GEMINI') || errText.includes('429') || errText.includes('Quota exceeded') || errText.includes('RESOURCE_EXHAUSTED')) {
+          const isQuota = errText.includes('Todos los modelos de GEMINI') || errText.includes('429') || errText.includes('Quota exceeded') || errText.includes('RESOURCE_EXHAUSTED');
+
+          if (isQuota) {
             fileObj.status = 'Cuota Excedida';
             renderFileList();
             updateProgress(
               Math.round((completedFiles / totalFiles) * 100),
-              'Error: Todos los modelos de GEMINI han excedido el límite de uso (429).'
+              '⚠️ Proceso detenido: Límite de cuota excedido (429). Por favor cambia la API Key en #apiKeyInput.'
             );
-            if (typeof showQuotaModal === 'function') showQuotaModal(errText);
-            break; // Stop remaining files loop
+            if (typeof showQuotaModal === 'function') {
+              showQuotaModal({
+                type: 'ALL_MODELS_EXCEEDED',
+                title: '🚫 Cuota Excedida en Todos los Modelos',
+                message: errText
+              });
+            }
           } else {
             fileObj.status = 'Error';
             renderFileList();
             updateProgress(
               Math.round((completedFiles / totalFiles) * 100),
-              `Error al procesar ${fileObj.name}`
+              `❌ Proceso detenido: Error al procesar ${fileObj.name}. Puedes cambiar la API Key e reintentar.`
             );
           }
+
+          renderFileList();
+          if (typeof window.focusApiKeyInput === 'function') window.focusApiKeyInput();
+          break; // Stop remaining files loop completely to let user update API Key
         }
 
         renderFileList();
@@ -1041,6 +1066,26 @@
         updateProgress(100, 'Esperando archivos PDF para los CÓDIGOS TN detectados...');
       }
     }
+
+    window.focusApiKeyInput = function() {
+      const input = document.getElementById('apiKeyInput');
+      if (input) {
+        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(() => {
+          input.focus();
+          if (input.type === 'password') {
+            input.type = 'text';
+          }
+          if (typeof input.select === 'function') {
+            input.select();
+          }
+          input.classList.add('ring-4', 'ring-rose-400', 'border-rose-500', 'bg-rose-50');
+          setTimeout(() => {
+            input.classList.remove('ring-4', 'ring-rose-400', 'border-rose-500', 'bg-rose-50');
+          }, 4000);
+        }, 350);
+      }
+    };
 
     function updateProgress(percent, statusMsg) {
       progressBarFill.style.width = percent + '%';
@@ -1079,8 +1124,11 @@
             <p class="font-bold text-rose-900 text-sm">Se ha capturado el error "code": 429.</p>
             <p class="text-slate-700 font-medium">Se ha excedido la cuota de uso de la funcionalidad para la API KEY utilizada.</p>
             <div class="mt-3 p-3 bg-rose-100/80 border border-rose-300 rounded-xl text-rose-950 font-bold text-xs leading-normal">
-              ⚠️ Todos los modelos de GEMINI han excedido el límite de uso y no será posible procesar los archivos PDFs.
+              ⚠️ Todos los modelos de GEMINI han excedido el límite de uso y el proceso se ha detenido. Por favor cambia la API Key para continuar.
             </div>
+            <button type="button" onclick="hideQuotaModal(); if (typeof window.focusApiKeyInput === 'function') window.focusApiKeyInput();" class="mt-3 w-full px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-xs">
+              🔑 Cambiar Clave de API Gemini (#apiKeyInput)
+            </button>
           </div>
         `;
       } else if (type === 'RETRY_OTHER_MODEL') {
@@ -2129,23 +2177,34 @@ Asegúrate de convertir el campo 'CANT.' a un número (float o int). Si un campo
         } catch (err) {
           console.error('Error procesando sub-PDF TN:', err);
           const errText = String(err.message || err || '');
-          if (errText.includes('Todos los modelos de GEMINI') || errText.includes('429') || errText.includes('Quota exceeded') || errText.includes('RESOURCE_EXHAUSTED')) {
+          const isQuota = errText.includes('Todos los modelos de GEMINI') || errText.includes('429') || errText.includes('Quota exceeded') || errText.includes('RESOURCE_EXHAUSTED');
+
+          if (isQuota) {
             fileObj.status = 'Cuota Excedida';
             renderFileList();
             updateProgress(
               Math.round((completedFiles / totalFiles) * 100),
-              'Error: Todos los modelos de GEMINI han excedido el límite de uso (429).'
+              '⚠️ Proceso detenido: Límite de cuota excedido (429). Por favor cambia la API Key en #apiKeyInput.'
             );
-            if (typeof showQuotaModal === 'function') showQuotaModal(errText);
-            break;
+            if (typeof showQuotaModal === 'function') {
+              showQuotaModal({
+                type: 'ALL_MODELS_EXCEEDED',
+                title: '🚫 Cuota Excedida en Todos los Modelos',
+                message: errText
+              });
+            }
           } else {
             fileObj.status = 'Error';
             renderFileList();
             updateProgress(
               Math.round((completedFiles / totalFiles) * 100),
-              `Error al procesar ${fileObj.name}`
+              `❌ Proceso detenido: Error al procesar sub-PDF ${fileObj.name}. Puedes cambiar la API Key e reintentar.`
             );
           }
+
+          renderFileList();
+          if (typeof window.focusApiKeyInput === 'function') window.focusApiKeyInput();
+          break; // Detiene completamente el bucle de procesamiento de sub-PDFs TN
         }
 
         renderFileList();
@@ -2263,10 +2322,17 @@ Asegúrate de convertir el campo 'CANT.' a un número (float o int). Si un campo
         const errText = String(err.message || err || '');
         if (errText.includes('Todos los modelos de GEMINI') || errText.includes('429') || errText.includes('Quota exceeded') || errText.includes('RESOURCE_EXHAUSTED')) {
           fileObj.status = 'Cuota Excedida';
-          if (typeof showQuotaModal === 'function') showQuotaModal(errText);
+          if (typeof showQuotaModal === 'function') {
+            showQuotaModal({
+              type: 'ALL_MODELS_EXCEEDED',
+              title: '🚫 Cuota Excedida en Todos los Modelos',
+              message: errText
+            });
+          }
         } else {
           fileObj.status = 'Error';
         }
+        if (typeof window.focusApiKeyInput === 'function') window.focusApiKeyInput();
       }
 
       rebuildAllRawItems();
