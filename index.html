@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Procesador de PDFs Escaneados - Extraer Tablas a Excel con Gemini AI</title>
-  
+  <title>Procesamiento y cálculo de TNs</title>
+  <link rel="icon" href="/favicon.png" type="image/png" sizes="32x32">
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,12 +22,12 @@
           },
           colors: {
             brand: {
-              50: '#f0fdf4',
-              100: '#dcfce7',
-              500: '#22c55e',
-              600: '#16a34a',
-              700: '#15803d',
-              900: '#14532d',
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0284c7',
+              600: '#0369a1',
+              700: '#035388',
+              900: '#0c2a4a',
             }
           }
         }
@@ -166,7 +166,7 @@
               Arrastra tus archivos PDF aquí o <span class="text-emerald-600 underline group-hover:text-emerald-700">haz clic para examinar</span>
             </p>
             <p class="text-xs text-slate-500 mt-1">
-              Soporta documentos PDFs escaneados obtenidos de la web de información técnica de EPE
+              Soporta documentos escaneados, imágenes de tablas o reportes técnicos en formato PDF
             </p>
           </div>
         </div>
@@ -296,7 +296,7 @@
 
         <!-- Filter / Search input -->
         <div class="py-2 flex items-center gap-2">
-          <input type="text" id="tableSearchInput" placeholder="Buscar por código, matrícula o descripción..."
+          <input type="text" id="tableSearchInput" placeholder="Buscar por TN, código, matrícula o descripción..."
             class="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg w-64 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white" />
         </div>
       </div>
@@ -324,17 +324,18 @@
           <table class="w-full text-left border-collapse text-xs">
             <thead class="sticky top-0 bg-slate-100 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider z-10 shadow-2xs">
               <tr>
+                <th class="py-3 px-4 w-28 text-sky-900 font-bold bg-sky-50/80">TN</th>
                 <th class="py-3 px-4 w-36">CÓDIGO</th>
                 <th class="py-3 px-4 w-32">MATRIC.</th>
                 <th class="py-3 px-4">DESCRIPCIÓN</th>
                 <th class="py-3 px-4 w-24 text-center">UNIDAD</th>
                 <th class="py-3 px-4 w-28 text-right bg-emerald-50/60 text-emerald-900 font-extrabold">CANT.</th>
-                <th class="py-3 px-4 w-64 text-slate-700 font-bold">ORIGEN (Archivos PDFs)</th>
+                <th class="py-3 px-4 w-60 text-slate-700 font-bold">ORIGEN (Archivos PDFs)</th>
               </tr>
             </thead>
             <tbody id="consolidatedTableBody" class="divide-y divide-slate-100">
               <tr>
-                <td colspan="6" class="py-12 text-center text-slate-400">
+                <td colspan="7" class="py-12 text-center text-slate-400">
                   <p class="text-sm font-medium text-slate-500">Aún no se han procesado tablas</p>
                   <p class="text-xs mt-1 text-slate-400">Presiona "Procesar PDFs Cargados" para realizar la extracción con Gemini AI.</p>
                 </td>
@@ -351,6 +352,7 @@
             <thead class="sticky top-0 bg-slate-100 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider z-10">
               <tr>
                 <th class="py-3 px-4 w-12 text-center">#</th>
+                <th class="py-3 px-4 w-28 text-sky-900 font-bold bg-sky-50/80">TN</th>
                 <th class="py-3 px-4 w-28">CÓDIGO</th>
                 <th class="py-3 px-4 w-28">MATRIC.</th>
                 <th class="py-3 px-4">DESCRIPCIÓN</th>
@@ -361,7 +363,7 @@
             </thead>
             <tbody id="rawTableBody" class="divide-y divide-slate-100">
               <tr>
-                <td colspan="7" class="py-12 text-center text-slate-400">Sin datos individuales extraídos.</td>
+                <td colspan="8" class="py-12 text-center text-slate-400">Sin datos individuales extraídos.</td>
               </tr>
             </tbody>
           </table>
@@ -382,7 +384,7 @@
   </main>
 
   <!-- Footer -->
-  <footer class="mt-auto border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500">
+	<footer class="mt-auto border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500">
     <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
       <p>© Procesador de Tablas PDF con Google Gemini AI & Exportador Excel (SheetJS)</p>
       <p class="text-2xs text-slate-400">Creado por <a style="color: rgb(24, 47, 255);" href="mailto:mzapata@epe.santafe.gov.ar">maxinz</a> con Google AI Studio</p>
@@ -398,6 +400,7 @@
       files: [], // { id, name, size, file, status, numPages, rawItems: [], pageCanvases: [] }
       allRawItems: [],
       consolidatedItems: [],
+      byTnItems: [],
       activeTab: 'consolidated',
       isProcessing: false,
       resolvedTnKeys: new Set()
@@ -742,8 +745,9 @@
           statusBadge = `<span class="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-2xs font-semibold">❌ Error</span>`;
         }
 
-        const tagHtml = fileObj.isSubTn
-          ? `<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 font-mono font-extrabold text-[10px] shrink-0">TN: ${fileObj.tnCode} (x${fileObj.multiplier})</span>`
+        const displayTn = fileObj.extractedTn || fileObj.tnCode;
+        const tagHtml = displayTn
+          ? `<span class="px-1.5 py-0.5 rounded bg-sky-100 text-sky-900 border border-sky-300 font-mono font-extrabold text-[10px] shrink-0">TN: ${displayTn}${fileObj.multiplier ? ` (x${fileObj.multiplier})` : ''}</span>`
           : '';
 
         let retryBtn = '';
@@ -945,17 +949,27 @@
             addPreviewCard(fileObj.name, pageNum, dataUrl);
 
             // Send to Gemini API (via server endpoint or direct REST fallback)
-            const extractedItems = await callGeminiVisionAPI(base64Image, currentKey);
+            const apiResult = await callGeminiVisionAPI(base64Image, currentKey);
+            const extractedItems = Array.isArray(apiResult) ? apiResult : (apiResult.items || []);
+            const extractedTnFromPage = (!Array.isArray(apiResult) && apiResult && apiResult.tn) ? apiResult.tn : '';
+            const cleanExtractedTn = cleanTnCode(extractedTnFromPage);
+            if (cleanExtractedTn) {
+              fileObj.extractedTn = cleanExtractedTn;
+            }
+
+            const pageTn = cleanExtractedTn || fileObj.extractedTn || cleanTnCode(fileObj.tnCode) || '';
 
             // Append metadata source
             extractedItems.forEach(item => {
               let itemWithMeta;
+              const itemTn = pageTn || cleanTnCode(item.tn) || '-';
               if (fileObj.isSubTn) {
                 const rawCant = normalizeCant(item.cant);
                 const multipliedCant = rawCant * (fileObj.multiplier || 1);
                 const sourceTag = `${fileObj.name} [Despiece ${fileObj.tnCode} x${fileObj.multiplier}]`;
                 itemWithMeta = {
                   ...item,
+                  tn: itemTn,
                   cant: multipliedCant,
                   sourceFile: sourceTag,
                   sourcePage: pageNum
@@ -963,6 +977,7 @@
               } else {
                 itemWithMeta = {
                   ...item,
+                  tn: itemTn,
                   sourceFile: fileObj.name,
                   sourcePage: pageNum
                 };
@@ -1105,25 +1120,35 @@
 
     // Call Gemini API (Supports Express endpoint `/api/process-page` or direct REST API client-side)
     async function callGeminiVisionAPI(imageBase64, apiKey) {
-      // Prompt specification from requirement:
-      const promptText = `Analiza el siguiente documento/tabla en la imagen. Extrae todos los renglones de la tabla detectando las siguientes columnas exactas:
+      // Prompt specification:
+      const promptText = `Analiza el siguiente documento/plano en la imagen:
+
+1. EXTRAER CÓDIGO TN DEL DOCUMENTO:
+Busca en el rectángulo o cajetín ubicado en el extremo inferior derecho de la hoja. Dentro de ese rectángulo inferior derecho, observa la primera fila (fila superior) y extrae el texto o código que siempre comenzará por "TN" (por ejemplo: "TN123", "TN-45", "TN 201a", etc.). Si no existe o no es legible, asigna una cadena vacía "".
+
+2. EXTRAER RENGLONES DE LA TABLA:
+Extrae todos los renglones de la tabla detectando las siguientes columnas exactas:
 - CÓDIGO
 - MATRIC.
 - DESCRIPCIÓN
 - UNIDAD
 - CANT.
 
-La columna "Código" puede comenzar de dos formas: 
-- Si comienza por "MN" sigue un espacio en blanco y luego un número de 1, 2, 3 o 4 cifras donde, opcionalmente, puede seguir de una letra. Por ejemplo: "MN 202c".
-- Si comienza por "TN" o "ETN" sigue de un número de 1, 2, 3 o 4 cifras seguido, opcionalmente, de una letra. Por ejemplo: "TN142g"
+Reglas para la tabla:
+- La columna "Código" puede comenzar de dos formas: 
+  * Si comienza por "MN" sigue un espacio en blanco y luego un número de 1, 2, 3 o 4 cifras donde, opcionalmente, puede seguir de una letra. Por ejemplo: "MN 202c".
+  * Si comienza por "TN" o "ETN" sigue de un número de 1, 2, 3 o 4 cifras seguido, opcionalmente, de una letra. Por ejemplo: "TN142g"
 - El campo "MATRÍC." consta sólo de números de 6 dígitos.
 - El campo "UNIDAD" tendrá solamente valores "Pza", "Mts" o "Conj".
-- Si "CÓDIGO" está vacio o no tiene valor asignar el valor 0 a dicho campo.
+- Si "CÓDIGO" está vacío o no tiene valor asignar el valor 0 a dicho campo.
 
-Devuelve un arreglo JSON de objetos con esta estructura exacta:
-[
-  { "codigo": "...", "matric": "...", "descripcion": "...", "unidad": "...", "cant": 0 }
-]
+Devuelve un objeto JSON con esta estructura exacta:
+{
+  "tn": "Código TN del documento extraído del rectángulo inferior derecho (ej: 'TN123')",
+  "items": [
+    { "codigo": "...", "matric": "...", "descripcion": "...", "unidad": "...", "cant": 0 }
+  ]
+}
 Asegúrate de convertir el campo 'CANT.' a un número (float o int). Si un campo no existe o no es legible, coloca una cadena vacía o 0 para la cantidad.`;
 
       // Strategy 1: Try server endpoint `/api/process-page` first
@@ -1140,7 +1165,10 @@ Asegúrate de convertir el campo 'CANT.' a un número (float o int). Si un campo
 
         if (res.ok) {
           const data = await res.json();
-          return Array.isArray(data.items) ? data.items : [];
+          return {
+            tn: data.tn || '',
+            items: Array.isArray(data.items) ? data.items : []
+          };
         }
 
         if (res.status === 429) {
@@ -1178,7 +1206,6 @@ Asegúrate de convertir el campo 'CANT.' a un número (float o int). Si un campo
       };
 
       let lastErr = null;
-      let allRateLimited = true;
 
       for (let i = 0; i < clientModels.length; i++) {
         const mName = clientModels[i];
@@ -1194,14 +1221,28 @@ Asegúrate de convertir el campo 'CANT.' a un número (float o int). Si un campo
 
             if (response.ok) {
               const resData = await response.json();
-              const textOutput = resData.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+              const textOutput = resData.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+              let parsed = {};
               try {
-                const parsed = JSON.parse(textOutput);
-                return Array.isArray(parsed) ? parsed : [];
+                parsed = JSON.parse(textOutput);
               } catch (e) {
                 const cleaned = textOutput.replace(/```json/g, '').replace(/```/g, '').trim();
-                return JSON.parse(cleaned) || [];
+                parsed = JSON.parse(cleaned) || {};
               }
+
+              let pageTn = '';
+              let items = [];
+
+              if (Array.isArray(parsed)) {
+                items = parsed;
+                const foundTn = parsed.find(i => i && i.tn);
+                if (foundTn) pageTn = String(foundTn.tn || '').trim();
+              } else if (parsed && typeof parsed === 'object') {
+                if (parsed.tn) pageTn = String(parsed.tn).trim();
+                if (Array.isArray(parsed.items)) items = parsed.items;
+              }
+
+              return { tn: pageTn, items: items };
             } else {
               const errJson = await response.json().catch(() => ({}));
               const errMsg = errJson.error?.message || `Error ${response.status} en Gemini (${mName})`;
@@ -1260,6 +1301,14 @@ Asegúrate de convertir el campo 'CANT.' a un número (float o int). Si un campo
     }
 
     // NORMALIZATION AND CONSOLIDATION LOGIC
+    function cleanTnCode(val) {
+      if (!val) return '';
+      let str = String(val).trim();
+      str = str.replace(/^[,\s.-]+|[,\s.-]+$/g, '');
+      if (!str) return '';
+      return str.toUpperCase();
+    }
+
     function normalizeCodigo(val) {
       if (!val) return "0";
       let str = String(val).trim();
@@ -1293,6 +1342,103 @@ Asegúrate de convertir el campo 'CANT.' a un número (float o int). Si un campo
 
     function consolidateData() {
       const items = state.allRawItems;
+
+      // -------------------------------------------------------------
+      // 1. Group BY TN (for Excel Section 1 per-TN detail)
+      // -------------------------------------------------------------
+      const byTnMap = new Map();
+      const byTnZeroCode = [];
+
+      for (const rawItem of items) {
+        const normCode = normalizeCodigo(rawItem.codigo);
+        const normMatric = normalizeMatric(rawItem.matric);
+        const normDesc = (rawItem.descripcion || '').trim();
+        const normUnit = normalizeUnidad(rawItem.unidad);
+        const normCant = normalizeCant(rawItem.cant);
+        const itemTn = cleanTnCode(rawItem.tn) || '-';
+        const sourceStr = `${rawItem.sourceFile || 'PDF'} (Pág. ${rawItem.sourcePage || 1})`;
+
+        if (normCode !== "0") {
+          const key = `${normCode}___${itemTn}`;
+          if (byTnMap.has(key)) {
+            const existing = byTnMap.get(key);
+            existing.cant += normCant;
+            if (!existing.matric && normMatric) existing.matric = normMatric;
+            if (!existing.descripcion && normDesc) existing.descripcion = normDesc;
+            if (!existing.unidad && normUnit) existing.unidad = normUnit;
+            if (!existing.sources.includes(sourceStr)) existing.sources.push(sourceStr);
+          } else {
+            byTnMap.set(key, {
+              tn: itemTn,
+              codigo: normCode,
+              matric: normMatric,
+              descripcion: normDesc,
+              unidad: normUnit,
+              cant: normCant,
+              sources: [sourceStr]
+            });
+          }
+        } else {
+          byTnZeroCode.push({
+            tn: itemTn,
+            codigo: "0",
+            matric: normMatric,
+            descripcion: normDesc,
+            unidad: normUnit,
+            cant: normCant,
+            sources: [sourceStr]
+          });
+        }
+      }
+
+      const byTnZeroGrouped = [];
+      for (const item of byTnZeroCode) {
+        let matched = false;
+        if (item.matric && item.matric.length >= 4) {
+          for (const existing of byTnZeroGrouped) {
+            if (existing.matric === item.matric && existing.tn === item.tn) {
+              existing.cant += item.cant;
+              if (!existing.descripcion && item.descripcion) existing.descripcion = item.descripcion;
+              if (!existing.unidad && item.unidad) existing.unidad = item.unidad;
+              if (!existing.sources.includes(item.sources[0])) existing.sources.push(item.sources[0]);
+              matched = true;
+              break;
+            }
+          }
+        }
+        if (!matched && item.descripcion) {
+          const descKey = item.descripcion.toLowerCase();
+          for (const existing of byTnZeroGrouped) {
+            if (existing.descripcion && existing.descripcion.toLowerCase() === descKey && existing.tn === item.tn) {
+              existing.cant += item.cant;
+              if (!existing.matric && item.matric) existing.matric = item.matric;
+              if (!existing.sources.includes(item.sources[0])) existing.sources.push(item.sources[0]);
+              matched = true;
+              break;
+            }
+          }
+        }
+        if (!matched) {
+          byTnZeroGrouped.push({ ...item });
+        }
+      }
+
+      const byTnList = [...byTnMap.values(), ...byTnZeroGrouped];
+      byTnList.sort((a, b) => {
+        const tnA = (a.tn || '').toUpperCase();
+        const tnB = (b.tn || '').toUpperCase();
+        if (tnA === '-' && tnB !== '-') return 1;
+        if (tnA !== '-' && tnB === '-') return -1;
+        const compTN = tnA.localeCompare(tnB, undefined, { numeric: true, sensitivity: 'base' });
+        if (compTN !== 0) return compTN;
+        return (a.codigo || '').localeCompare(b.codigo || '', undefined, { numeric: true, sensitivity: 'base' });
+      });
+
+      state.byTnItems = byTnList;
+
+      // -------------------------------------------------------------
+      // 2. Group BY UNIQUE ITEM ACROSS ALL TNs (for UI Table & Excel Section 2)
+      // -------------------------------------------------------------
       const consolidatedMap = new Map();
       const zeroCodeItems = [];
 
@@ -1302,86 +1448,117 @@ Asegúrate de convertir el campo 'CANT.' a un número (float o int). Si un campo
         const normDesc = (rawItem.descripcion || '').trim();
         const normUnit = normalizeUnidad(rawItem.unidad);
         const normCant = normalizeCant(rawItem.cant);
+        const itemTn = cleanTnCode(rawItem.tn);
         const sourceStr = `${rawItem.sourceFile || 'PDF'} (Pág. ${rawItem.sourcePage || 1})`;
 
         if (normCode !== "0") {
-          // Group by CÓDIGO
           if (consolidatedMap.has(normCode)) {
             const existing = consolidatedMap.get(normCode);
             existing.cant += normCant;
-            existing.occurrenceCount = (existing.occurrenceCount || 1) + 1;
+            existing.occurrenceCount += 1;
+            if (itemTn && itemTn !== '-') existing.tns.add(itemTn);
             if (!existing.matric && normMatric) existing.matric = normMatric;
             if (!existing.descripcion && normDesc) existing.descripcion = normDesc;
             if (!existing.unidad && normUnit) existing.unidad = normUnit;
-            existing.sources.push(sourceStr);
+            if (!existing.sources.includes(sourceStr)) existing.sources.push(sourceStr);
           } else {
+            const tnsSet = new Set();
+            if (itemTn && itemTn !== '-') tnsSet.add(itemTn);
             consolidatedMap.set(normCode, {
               codigo: normCode,
               matric: normMatric,
               descripcion: normDesc,
               unidad: normUnit,
               cant: normCant,
+              tns: tnsSet,
               occurrenceCount: 1,
               sources: [sourceStr]
             });
           }
         } else {
-          // CÓDIGO is 0
           zeroCodeItems.push({
             codigo: "0",
             matric: normMatric,
             descripcion: normDesc,
             unidad: normUnit,
             cant: normCant,
-            occurrenceCount: 1,
+            tn: itemTn,
             sources: [sourceStr]
           });
         }
       }
 
-      // Consolidate zero code items based on MATRÍC. equality or DESCRIPCIÓN
       const zeroCodeGrouped = [];
-
       for (const item of zeroCodeItems) {
         let matched = false;
-
-        // Check MATRIC equality if MATRIC exists
         if (item.matric && item.matric.length >= 4) {
           for (const existing of zeroCodeGrouped) {
             if (existing.matric === item.matric) {
               existing.cant += item.cant;
-              existing.occurrenceCount = (existing.occurrenceCount || 1) + 1;
+              existing.occurrenceCount += 1;
+              if (item.tn && item.tn !== '-') existing.tns.add(item.tn);
               if (!existing.descripcion && item.descripcion) existing.descripcion = item.descripcion;
               if (!existing.unidad && item.unidad) existing.unidad = item.unidad;
-              existing.sources.push(item.sources[0]);
+              if (!existing.sources.includes(item.sources[0])) existing.sources.push(item.sources[0]);
               matched = true;
               break;
             }
           }
         }
 
-        // If not matched by matric, check by description
         if (!matched && item.descripcion) {
           const descKey = item.descripcion.toLowerCase();
           for (const existing of zeroCodeGrouped) {
             if (existing.descripcion && existing.descripcion.toLowerCase() === descKey) {
               existing.cant += item.cant;
-              existing.occurrenceCount = (existing.occurrenceCount || 1) + 1;
+              existing.occurrenceCount += 1;
+              if (item.tn && item.tn !== '-') existing.tns.add(item.tn);
               if (!existing.matric && item.matric) existing.matric = item.matric;
-              existing.sources.push(item.sources[0]);
+              if (!existing.sources.includes(item.sources[0])) existing.sources.push(item.sources[0]);
               matched = true;
               break;
             }
           }
         }
 
-        // Add as separate element if still not matched
         if (!matched) {
-          zeroCodeGrouped.push({ ...item });
+          const tnsSet = new Set();
+          if (item.tn && item.tn !== '-') tnsSet.add(item.tn);
+          zeroCodeGrouped.push({
+            codigo: "0",
+            matric: item.matric,
+            descripcion: item.descripcion,
+            unidad: item.unidad,
+            cant: item.cant,
+            tns: tnsSet,
+            occurrenceCount: 1,
+            sources: [...item.sources]
+          });
         }
       }
 
-      state.consolidatedItems = [...consolidatedMap.values(), ...zeroCodeGrouped];
+      const allConsolidated = [...consolidatedMap.values(), ...zeroCodeGrouped];
+
+      // Convert Set of tns to sorted tnList / tnStr
+      allConsolidated.forEach(item => {
+        const sortedTns = Array.from(item.tns).sort((a, b) =>
+          a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+        );
+        item.tnList = sortedTns;
+        item.tnStr = sortedTns.length > 0 ? sortedTns.join(", ") : "-";
+      });
+
+      // Sort consolidated items by CÓDIGO (or MATRÍC / DESCRIPCIÓN)
+      allConsolidated.sort((a, b) => {
+        if (a.codigo !== "0" && b.codigo !== "0") {
+          return a.codigo.localeCompare(b.codigo, undefined, { numeric: true, sensitivity: 'base' });
+        }
+        if (a.codigo !== "0") return -1;
+        if (b.codigo !== "0") return 1;
+        return (a.descripcion || '').localeCompare(b.descripcion || '');
+      });
+
+      state.consolidatedItems = allConsolidated;
 
       // Count repeated items for metrics badge
       const repeatedCount = state.consolidatedItems.filter(item => (item.occurrenceCount > 1) || (item.sources && item.sources.length > 1)).length;
@@ -1407,7 +1584,8 @@ Asegúrate de convertir el campo 'CANT.' a un número (float o int). Si un campo
       const searchTerm = tableSearchInput.value.toLowerCase().trim();
       const filtered = state.consolidatedItems.filter(item => {
         if (!searchTerm) return true;
-        return (item.codigo || '').toLowerCase().includes(searchTerm) ||
+        return (item.tnStr || '').toLowerCase().includes(searchTerm) ||
+               (item.codigo || '').toLowerCase().includes(searchTerm) ||
                (item.matric || '').toLowerCase().includes(searchTerm) ||
                (item.descripcion || '').toLowerCase().includes(searchTerm);
       });
@@ -1415,7 +1593,7 @@ Asegúrate de convertir el campo 'CANT.' a un número (float o int). Si un campo
       if (filtered.length === 0) {
         consolidatedTableBody.innerHTML = `
           <tr>
-            <td colspan="6" class="py-12 text-center text-slate-400">
+            <td colspan="7" class="py-12 text-center text-slate-400">
               ${state.consolidatedItems.length === 0 ? 'Aún no se han procesado tablas de PDFs.' : 'No se encontraron ítems coincidentes con el filtro de búsqueda.'}
             </td>
           </tr>
@@ -1453,7 +1631,12 @@ Asegúrate de convertir el campo 'CANT.' a un número (float o int). Si un campo
              </div>`
           : '<span class="text-slate-400 text-2xs">-</span>';
 
+        const tnBadge = item.tnList && item.tnList.length > 0
+          ? `<div class="flex flex-wrap gap-1">${item.tnList.map(tn => `<span class="px-2 py-0.5 rounded bg-sky-100 text-sky-900 border border-sky-300 font-mono font-bold text-xs shadow-2xs">${tn}</span>`).join('')}</div>`
+          : `<span class="text-slate-400 font-mono text-xs">-</span>`;
+
         tr.innerHTML = `
+          <td class="py-3 px-4">${tnBadge}</td>
           <td class="py-3 px-4">${codeCellContent}</td>
           <td class="py-3 px-4 font-mono ${isRepeated ? 'text-slate-950 font-semibold' : 'text-slate-700'}">${item.matric || '-'}</td>
           <td class="py-3 px-4 font-medium ${isRepeated ? 'text-slate-950' : 'text-slate-900'}">${item.descripcion || '-'}</td>
@@ -1472,7 +1655,8 @@ Asegúrate de convertir el campo 'CANT.' a un número (float o int). Si un campo
       const searchTerm = tableSearchInput.value.toLowerCase().trim();
       const filtered = state.allRawItems.filter(item => {
         if (!searchTerm) return true;
-        return (item.codigo || '').toLowerCase().includes(searchTerm) ||
+        return (item.tn || '').toLowerCase().includes(searchTerm) ||
+               (item.codigo || '').toLowerCase().includes(searchTerm) ||
                (item.matric || '').toLowerCase().includes(searchTerm) ||
                (item.descripcion || '').toLowerCase().includes(searchTerm);
       });
@@ -1480,7 +1664,7 @@ Asegúrate de convertir el campo 'CANT.' a un número (float o int). Si un campo
       if (filtered.length === 0) {
         rawTableBody.innerHTML = `
           <tr>
-            <td colspan="7" class="py-12 text-center text-slate-400">Sin registros individuales extraídos.</td>
+            <td colspan="8" class="py-12 text-center text-slate-400">Sin registros individuales extraídos.</td>
           </tr>
         `;
         return;
@@ -1491,8 +1675,13 @@ Asegúrate de convertir el campo 'CANT.' a un número (float o int). Si un campo
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-slate-50 transition-colors border-b border-slate-100';
 
+        const tnBadge = item.tn && item.tn !== '-'
+          ? `<span class="px-2 py-0.5 rounded bg-sky-100 text-sky-900 border border-sky-300 font-mono font-bold text-2xs">${item.tn}</span>`
+          : `<span class="text-slate-400 font-mono text-2xs">-</span>`;
+
         tr.innerHTML = `
           <td class="py-2.5 px-4 text-center text-slate-400 font-mono text-2xs">${idx + 1}</td>
+          <td class="py-2.5 px-4 font-mono">${tnBadge}</td>
           <td class="py-2.5 px-4 font-bold font-mono text-slate-800">${item.codigo || '0'}</td>
           <td class="py-2.5 px-4 font-mono text-slate-600">${item.matric || '-'}</td>
           <td class="py-2.5 px-4 text-slate-800">${item.descripcion || '-'}</td>
@@ -1506,30 +1695,61 @@ Asegúrate de convertir el campo 'CANT.' a un número (float o int). Si un campo
 
     // EXPORT TO EXCEL (.xlsx)
     function exportToExcel() {
-      if (state.consolidatedItems.length === 0) {
+      const itemsForDetail = (state.byTnItems && state.byTnItems.length > 0) ? state.byTnItems : state.consolidatedItems;
+      if (itemsForDetail.length === 0) {
         alert('No hay datos consolidados para exportar.');
         return;
       }
 
-      // Prepare Excel rows array with exact official headers
-      const excelRows = state.consolidatedItems.map(item => ({
-        "CÓDIGO": item.codigo,
-        "MATRIC.": item.matric,
-        "DESCRIPCIÓN": item.descripcion,
-        "UNIDAD": item.unidad,
-        "CANT.": item.cant
-      }));
+      const headers = ["TN", "CÓDIGO", "MATRIC.", "DESCRIPCIÓN", "UNIDAD", "CANT."];
 
-      // Create SheetJS Worksheet & Workbook
-      const worksheet = XLSX.utils.json_to_sheet(excelRows);
+      // 1. Detailed items rows (ordered by TN)
+      const detailRows = itemsForDetail.map(item => [
+        item.tn || item.tnStr || "-",
+        item.codigo || "0",
+        item.matric || "-",
+        item.descripcion || "-",
+        item.unidad || "Pza",
+        item.cant
+      ]);
+
+      // 2. Aggregate total material quantities across all TNs
+      const totalsList = state.consolidatedItems.map(item => [
+        item.tnStr || "-",
+        item.codigo || "0",
+        item.matric || "-",
+        item.descripcion || "-",
+        item.unidad || "Pza",
+        item.cant
+      ]);
+
+      // Build overall array of arrays for SheetJS
+      const aoaData = [
+        headers,
+        ...detailRows,
+        [], // Empty row separator
+        ["Cantidades de materiales totales", "", "", "", "", ""],
+        headers,
+        ...totalsList
+      ];
+
+      // Create SheetJS Worksheet
+      const worksheet = XLSX.utils.aoa_to_sheet(aoaData);
 
       // Define Column Widths
       worksheet['!cols'] = [
+        { wch: 22 }, // TN (may contain comma-separated TN codes)
         { wch: 16 }, // CÓDIGO
         { wch: 14 }, // MATRIC.
         { wch: 50 }, // DESCRIPCIÓN
         { wch: 12 }, // UNIDAD
         { wch: 12 }  // CANT.
+      ];
+
+      // Merge title row cells across columns 0 to 5
+      const titleRowIndex = detailRows.length + 2;
+      worksheet['!merges'] = [
+        { s: { r: titleRowIndex, c: 0 }, e: { r: titleRowIndex, c: 5 } }
       ];
 
       const workbook = XLSX.utils.book_new();
@@ -1680,8 +1900,12 @@ Asegúrate de convertir el campo 'CANT.' a un número (float o int). Si un campo
             inputEl.addEventListener('change', (e) => {
               if (e.target.files && e.target.files.length > 0) {
                 Array.from(e.target.files).forEach(f => {
-                  tn.files.push(f);
+                  const exists = tn.files.some(existing => existing.name === f.name && existing.size === f.size);
+                  if (!exists) {
+                    tn.files.push(f);
+                  }
                 });
+                e.target.value = '';
                 renderTnModalContent();
                 updateProcessTnBtnState();
               }
@@ -1740,21 +1964,24 @@ Asegúrate de convertir el campo 'CANT.' a un número (float o int). Si un campo
 
         for (const tn of pendingTnCodes) {
           if (fClean.includes(tn.key)) {
-            tn.files.push(file);
+            if (!tn.files.some(existing => existing.name === file.name && existing.size === file.size)) {
+              tn.files.push(file);
+            }
             matched = true;
             break;
           }
         }
 
-        if (!matched && pendingTnCodes.length === 1) {
-          pendingTnCodes[0].files.push(file);
-          matched = true;
-        }
-
         if (!matched && pendingTnCodes.length > 0) {
-          pendingTnCodes[0].files.push(file);
+          const targetTn = pendingTnCodes[0];
+          if (!targetTn.files.some(existing => existing.name === file.name && existing.size === file.size)) {
+            targetTn.files.push(file);
+          }
         }
       });
+
+      const generalInput = document.getElementById('tnGeneralFileInput');
+      if (generalInput) generalInput.value = '';
 
       renderTnModalContent();
       updateProcessTnBtnState();
@@ -1768,13 +1995,21 @@ Asegúrate de convertir el campo 'CANT.' a un número (float o int). Si un campo
         state.resolvedTnKeys.add(tnGroup.key);
 
         for (const file of tnGroup.files) {
-          filesToProcess.push({
-            file: file,
-            tnCode: tnGroup.code,
-            tnKey: tnGroup.key,
-            multiplier: tnGroup.multiplier || 1
-          });
+          const alreadyInState = state.files.some(sf =>
+            sf.name === file.name &&
+            sf.size === file.size &&
+            sf.tnCode === tnGroup.code
+          );
+          if (!alreadyInState) {
+            filesToProcess.push({
+              file: file,
+              tnCode: tnGroup.code,
+              tnKey: tnGroup.key,
+              multiplier: tnGroup.multiplier || 1
+            });
+          }
         }
+        tnGroup.files = [];
       }
 
       if (filesToProcess.length === 0) {
@@ -1853,15 +2088,25 @@ Asegúrate de convertir el campo 'CANT.' a un número (float o int). Si un campo
 
             addPreviewCard(`${fileObj.name} (${fileObj.tnCode})`, pageNum, dataUrl);
 
-            const extractedItems = await callGeminiVisionAPI(base64Image, currentKey);
+            const apiResult = await callGeminiVisionAPI(base64Image, currentKey);
+            const extractedItems = Array.isArray(apiResult) ? apiResult : (apiResult.items || []);
+            const extractedTnFromPage = (!Array.isArray(apiResult) && apiResult && apiResult.tn) ? apiResult.tn : '';
+            const cleanExtractedTn = cleanTnCode(extractedTnFromPage);
+            if (cleanExtractedTn) {
+              fileObj.extractedTn = cleanExtractedTn;
+            }
+
+            const pageTn = cleanExtractedTn || fileObj.extractedTn || cleanTnCode(fileObj.tnCode) || '';
 
             extractedItems.forEach(item => {
               const rawCant = normalizeCant(item.cant);
               const multipliedCant = rawCant * (fileObj.multiplier || 1);
               const sourceTag = `${fileObj.name} [Despiece ${fileObj.tnCode} x${fileObj.multiplier}]`;
+              const itemTn = pageTn || cleanTnCode(item.tn) || '-';
 
               const itemWithMeta = {
                 ...item,
+                tn: itemTn,
                 cant: multipliedCant,
                 sourceFile: sourceTag,
                 sourcePage: pageNum
@@ -1971,16 +2216,26 @@ Asegúrate de convertir el campo 'CANT.' a un número (float o int). Si un campo
 
           addPreviewCard(fileObj.name + (fileObj.tnCode ? ` [${fileObj.tnCode}]` : ''), pageNum, dataUrl);
 
-          const extractedItems = await callGeminiVisionAPI(base64Image, currentKey);
+          const apiResult = await callGeminiVisionAPI(base64Image, currentKey);
+          const extractedItems = Array.isArray(apiResult) ? apiResult : (apiResult.items || []);
+          const extractedTnFromPage = (!Array.isArray(apiResult) && apiResult && apiResult.tn) ? apiResult.tn : '';
+          const cleanExtractedTn = cleanTnCode(extractedTnFromPage);
+          if (cleanExtractedTn) {
+            fileObj.extractedTn = cleanExtractedTn;
+          }
+
+          const pageTn = cleanExtractedTn || fileObj.extractedTn || cleanTnCode(fileObj.tnCode) || '';
 
           extractedItems.forEach(item => {
             let itemWithMeta;
+            const itemTn = pageTn || cleanTnCode(item.tn) || '-';
             if (fileObj.isSubTn) {
               const rawCant = normalizeCant(item.cant);
               const multipliedCant = rawCant * (fileObj.multiplier || 1);
               const sourceTag = `${fileObj.name} [Despiece ${fileObj.tnCode} x${fileObj.multiplier}]`;
               itemWithMeta = {
                 ...item,
+                tn: itemTn,
                 cant: multipliedCant,
                 sourceFile: sourceTag,
                 sourcePage: pageNum
@@ -1988,6 +2243,7 @@ Asegúrate de convertir el campo 'CANT.' a un número (float o int). Si un campo
             } else {
               itemWithMeta = {
                 ...item,
+                tn: itemTn,
                 sourceFile: fileObj.name,
                 sourcePage: pageNum
               };

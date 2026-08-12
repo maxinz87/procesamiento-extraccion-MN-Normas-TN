@@ -38,24 +38,34 @@ async function startServer() {
         }
       });
 
-      const promptText = `Analiza el siguiente documento/tabla en la imagen. Extrae todos los renglones de la tabla detectando las siguientes columnas exactas:
+      const promptText = `Analiza el siguiente documento/plano en la imagen:
+
+1. EXTRAER CÓDIGO TN DEL DOCUMENTO:
+Busca en el rectángulo o cajetín ubicado en el extremo inferior derecho de la hoja. Dentro de ese rectángulo inferior derecho, observa la primera fila (fila superior) y extrae el texto o código que siempre comenzará por "TN" (por ejemplo: "TN123", "TN-45", "TN 201a", etc.). Si no existe o no es legible, asigna una cadena vacía "".
+
+2. EXTRAER RENGLONES DE LA TABLA:
+Extrae todos los renglones de la tabla detectando las siguientes columnas exactas:
 - CÓDIGO
 - MATRIC.
 - DESCRIPCIÓN
 - UNIDAD
 - CANT.
 
-La columna "Código" puede comenzar de dos formas: 
-- Si comienza por "MN" sigue un espacio en blanco y luego un número de 1, 2, 3 o 4 cifras donde, opcionalmente, puede seguir de una letra. Por ejemplo: "MN 202c".
-- Si comienza por "TN" o "ETN" sigue de un número de 1, 2, 3 o 4 cifras seguido, opcionalmente, de una letra. Por ejemplo: "TN142g"
+Reglas para la tabla:
+- La columna "Código" puede comenzar de dos formas: 
+  * Si comienza por "MN" sigue un espacio en blanco y luego un número de 1, 2, 3 o 4 cifras donde, opcionalmente, puede seguir de una letra. Por ejemplo: "MN 202c".
+  * Si comienza por "TN" o "ETN" sigue de un número de 1, 2, 3 o 4 cifras seguido, opcionalmente, de una letra. Por ejemplo: "TN142g"
 - El campo "MATRÍC." consta sólo de números de 6 dígitos.
 - El campo "UNIDAD" tendrá solamente valores "Pza", "Mts" o "Conj".
-- Si "CÓDIGO" está vacio o no tiene valor asignar el valor 0 a dicho campo.
+- Si "CÓDIGO" está vacío o no tiene valor asignar el valor 0 a dicho campo.
 
-Devuelve un arreglo JSON de objetos con esta estructura exacta:
-[
-  { "codigo": "...", "matric": "...", "descripcion": "...", "unidad": "...", "cant": 0 }
-]
+Devuelve un objeto JSON con esta estructura exacta:
+{
+  "tn": "Código TN del documento extraído del rectángulo inferior derecho (ej: 'TN123')",
+  "items": [
+    { "codigo": "...", "matric": "...", "descripcion": "...", "unidad": "...", "cant": 0 }
+  ]
+}
 Asegúrate de convertir el campo 'CANT.' a un número (float o int). Si un campo no existe o no es legible, coloca una cadena vacía o 0 para la cantidad.`;
 
       const candidateModels = Array.from(new Set(
@@ -134,8 +144,8 @@ Asegúrate de convertir el campo 'CANT.' a un número (float o int). Si un campo
         throw lastError || new Error('No se pudo procesar la imagen con los modelos de Gemini disponibles.');
       }
 
-      const text = response.text || '[]';
-      let parsedData = [];
+      const text = response.text || '{}';
+      let parsedData: any = {};
       try {
         parsedData = JSON.parse(text);
       } catch (e) {
@@ -143,7 +153,23 @@ Asegúrate de convertir el campo 'CANT.' a un número (float o int). Si un campo
         parsedData = JSON.parse(cleanedText);
       }
 
-      res.json({ items: parsedData });
+      let pageTn = '';
+      let items: any[] = [];
+
+      if (Array.isArray(parsedData)) {
+        items = parsedData;
+        const itemWithTn = parsedData.find((i: any) => i && i.tn);
+        if (itemWithTn) pageTn = String(itemWithTn.tn || '').trim();
+      } else if (parsedData && typeof parsedData === 'object') {
+        if (parsedData.tn) pageTn = String(parsedData.tn).trim();
+        if (Array.isArray(parsedData.items)) {
+          items = parsedData.items;
+        } else if (Array.isArray(parsedData.data)) {
+          items = parsedData.data;
+        }
+      }
+
+      res.json({ tn: pageTn, items: items });
     } catch (error: any) {
       console.error('Error procesando página con Gemini:', error);
       const errMsg = String(error.message || error);
